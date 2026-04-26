@@ -25,5 +25,8 @@ def test_search_outputs_parsed_query_details() -> None:
     assert "Gemini" in result.output
     assert "30d" in result.output
     assert "sentiment, topics" in result.output
+    assert "source_collection" in result.output
+    assert "run.started" in result.output
+    assert "run.plan_generated" in result.output
     
 
