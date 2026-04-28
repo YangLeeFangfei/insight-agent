@@ -39,3 +39,19 @@ def insert_article(db_path: Path, article: dict[str, str]) -> None:
 def list_articles(db_path: Path):
     with _connect(db_path) as conn:
         return list(conn.execute("SELECT * FROM articles ORDER BY id ASC"))
+
+def list_articles_for_companies(db_path: Path, companies: list[str], ) -> list[sqlite3.Row]:
+    placeholders = ", ".join(["?"] * len(companies))
+
+    with _connect(db_path) as conn:
+        return list(
+            conn.execute(
+                f"""
+                SELECT *
+                FROM articles
+                WHERE company IN ({placeholders})
+                ORDER BY id ASC
+                """,
+                tuple(companies),
+            )
+        )
