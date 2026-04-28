@@ -89,7 +89,9 @@ if st.button("Preview Run"):
 
         st.write("Evidence:")
         for item in report["evidence"]:
-            st.write(f"- {item['snippet_text']}")
+            st.write(f"- {item['company']} / {item['source_name']}: {item['title']}")
+            st.write(item["snippet_text"])
+            st.write(item["url"])
 
         st.subheader("Matching Articles")
         for row in matching_articles:

@@ -119,3 +119,175 @@ def test_build_preview_report_uses_article_records() -> None:
     assert "2 articles" in payload["summary"]
     assert payload["findings"][0].startswith("Companies covered:")
     assert payload["evidence"][0]["snippet_text"].startswith("OpenAI launched")
+
+def test_build_preview_report_uses_bounded_evidence_snippet() -> None:
+    long_content = (
+        "OpenAI announced several updates before the main enterprise launch. "
+        "The enterprise feature gives teams more control over deployment, "
+        "governance, and internal adoption workflows."
+    )
+
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
+            "companies": ["ChatGPT"],
+            "time_range": "30d",
+            "metrics": ["sentiment", "topics"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Enterprise launch",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": long_content,
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-enterprise-launch",
+                "sentiment": "positive",
+            }
+        ],
+    )
+
+    snippet = payload["evidence"][0]
+
+    assert "enterprise" in snippet["snippet_text"].lower()
+    assert len(snippet["snippet_text"]) < len(long_content)
+    assert snippet["snippet_start"] >= 0
+    assert snippet["snippet_end"] > snippet["snippet_start"]
+
+def test_build_preview_report_returns_evidence_for_each_company() -> None:
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
+            "companies": ["ChatGPT", "Gemini"],
+            "time_range": "30d",
+            "metrics": ["sentiment", "topics"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "OpenAI launched a new enterprise feature for ChatGPT teams.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            },
+            {
+                "company": "Gemini",
+                "title": "Model update",
+                "source_name": "Google",
+                "source_type": "announcement",
+                "content": "Gemini announced a model update for developer workflows.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T11:00:00",
+                "url": "https://example.com/gemini-update",
+                "sentiment": "neutral",
+            },
+        ],
+    )
+
+    assert len(payload["evidence"]) == 2
+    assert "ChatGPT" in payload["evidence"][0]["snippet_text"]
+    assert "Gemini" in payload["evidence"][1]["snippet_text"]
+
+def test_build_preview_report_attaches_evidence_source_metadata() -> None:
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
+            "companies": ["ChatGPT"],
+            "time_range": "30d",
+            "metrics": ["sentiment", "topics"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "OpenAI launched a new enterprise feature for ChatGPT teams.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ],
+    )
+
+    evidence = payload["evidence"][0]
+
+    assert evidence["company"] == "ChatGPT"
+    assert evidence["title"] == "Launch update"
+    assert evidence["source_name"] == "OpenAI"
+    assert evidence["url"] == "https://example.com/openai-launch"
+
+

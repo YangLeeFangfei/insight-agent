@@ -1,3 +1,7 @@
+from insight_agent.normalize.evidence import build_evidence_snippet
+
+
+
 def build_report_payload(
     summary: str,
     findings: list[str],
@@ -47,17 +51,17 @@ def build_preview_report(
         f"Article count: {article_count}",
     ]
 
-    first_article = articles[0]
-    evidence_text = first_article["content"]
-    evidence = [
-        {
-            "snippet_text": evidence_text,
-            "snippet_start": 0,
-            "snippet_end": len(evidence_text),
-        }
-    ]
+    evidence = []
+
+    for article in articles:
+        keyword = article["company"]
+        snippet = build_evidence_snippet(article["content"], keyword)
+        snippet["company"] = article["company"]
+        snippet["title"] = article["title"]
+        snippet["source_name"] = article["source_name"]
+        snippet["url"] = article["url"]
+    
+        evidence.append(snippet)
 
     return build_report_payload(summary, findings, evidence)
-
-
 
