@@ -1,10 +1,12 @@
+from pathlib import Path
+
 import streamlit as st
 
 from insight_agent.agent.harness import initialize_run
 from insight_agent.agent.planner import parse_query
-from insight_agent.reporting.builder import build_preview_report
 from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
-from pathlib import Path
+from insight_agent.reporting.builder import build_preview_report
+from insight_agent.reporting.html import write_html_report
 
 
 st.set_page_config(page_title="Insight Agent", layout="wide")
@@ -52,12 +54,16 @@ if st.button("Preview Run"):
 
         for article in sample_articles:
             insert_article(db_path, article)
-        
+
     matching_articles = list_articles_for_companies(db_path, query_spec["companies"])
     article_records = [dict(row) for row in matching_articles]
 
     run = initialize_run(query_spec)
     report = build_preview_report(query_spec, run, article_records)
+    report_path = write_html_report(
+        report,
+        Path("data/reports/preview-report.html"),
+    )
 
     left_col, right_col = st.columns([1, 1])
 
@@ -79,9 +85,10 @@ if st.button("Preview Run"):
         st.subheader("Trace Events")
         for event in run["events"]:
             st.write(f"- {event['event_type']}")
-        
+
         st.subheader("Report Preview")
         st.write(f"Summary: {report['summary']}")
+        st.write(f"HTML report: {report_path}")
 
         st.write("Findings:")
         for finding in report["findings"]:
@@ -96,7 +103,7 @@ if st.button("Preview Run"):
         st.subheader("Matching Articles")
         for row in matching_articles:
             st.write(f"- {row['company']}: {row['title']}")
-    
+
 else:
     st.subheader("Current Status")
     st.write("UI scaffold is ready.")
