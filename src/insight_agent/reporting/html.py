@@ -1,18 +1,19 @@
+from html import escape
 from pathlib import Path
 
 
 def render_html_report(payload: dict[str, object]) -> str:
     findings_html = "".join(
-        f"<li>{finding}</li>"
+        f"<li>{escape(finding)}</li>"
         for finding in payload["findings"]
     )
 
     evidence_html = "".join(
         f"""
         <article>
-            <h3>{item["company"]}: {item["title"]}</h3>
-            <p>{item["snippet_text"]}</p>
-            <a href="{item["url"]}">{item["source_name"]}</a>
+            <h3>{escape(item["company"])}: {escape(item["title"])}</h3>
+            <p>{escape(item["snippet_text"])}</p>
+            <a href="{escape(item["url"])}">{escape(item["source_name"])}</a>
         </article>
         """
         for item in payload["evidence"]
@@ -24,7 +25,7 @@ def render_html_report(payload: dict[str, object]) -> str:
             <h1>Insight Agent Report</h1>
             <section>
                 <h2>Summary</h2>
-                <p>{payload["summary"]}</p>
+                <p>{escape(payload["summary"])}</p>
             </section>
             <section>
                 <h2>Findings</h2>
@@ -37,6 +38,7 @@ def render_html_report(payload: dict[str, object]) -> str:
         </body>
     </html>
     """
+
 
 def write_html_report(
     payload: dict[str, object],

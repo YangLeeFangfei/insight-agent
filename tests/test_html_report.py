@@ -56,3 +56,29 @@ def test_write_html_report_writes_file(tmp_path) -> None:
     assert written_path == output_path
     assert output_path.exists()
     assert "Prepared analysis run for ChatGPT." in output_path.read_text()
+
+def test_render_html_report_escapes_payload_content() -> None:
+    html = render_html_report(
+        {
+            "summary": "<script>alert('summary')</script>",
+            "findings": ["<b>dangerous finding</b>"],
+            "evidence": [
+                {
+                    "company": "ChatGPT",
+                    "title": "<script>alert('title')</script>",
+                    "source_name": "OpenAI",
+                    "url": "https://example.com/openai-launch",
+                    "snippet_text": "<img src=x onerror=alert(1)>",
+                    "snippet_start": 0,
+                    "snippet_end": 28,
+                }
+            ],
+        }
+    )
+
+    assert "<script>" not in html
+    assert "<b>dangerous finding</b>" not in html
+    assert "<img src=x onerror=alert(1)>" not in html
+    assert "&lt;script&gt;" in html
+    assert "&lt;b&gt;dangerous finding&lt;/b&gt;" in html
+
