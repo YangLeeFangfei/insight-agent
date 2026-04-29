@@ -82,3 +82,29 @@ def test_render_html_report_escapes_payload_content() -> None:
     assert "&lt;script&gt;" in html
     assert "&lt;b&gt;dangerous finding&lt;/b&gt;" in html
 
+def test_render_html_report_includes_trace_events() -> None:
+    html = render_html_report(
+        {
+            "summary": "Prepared analysis run for ChatGPT.",
+            "findings": ["Sentiment mix: positive=1"],
+            "evidence": [
+                {
+                    "company": "ChatGPT",
+                    "title": "Launch update",
+                    "source_name": "OpenAI",
+                    "url": "https://example.com/openai-launch",
+                    "snippet_text": "ChatGPT launched a new enterprise feature.",
+                    "snippet_start": 0,
+                    "snippet_end": 42,
+                }
+            ],
+            "trace_events": [
+                {"event_type": "run.started", "payload": {"query": "Compare ChatGPT"}},
+                {"event_type": "run.plan_generated", "payload": {"stages": ["analysis"]}},
+            ],
+        }
+    )
+
+    assert "Trace Events" in html
+    assert "run.started" in html
+    assert "run.plan_generated" in html

@@ -76,4 +76,6 @@ def build_preview_report(
 
         evidence.append(snippet)
 
-    return build_report_payload(summary, findings, evidence)
+    payload = build_report_payload(summary, findings, evidence)
+    payload["trace_events"] = run["events"]
+    return payload

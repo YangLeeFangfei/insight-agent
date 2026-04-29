@@ -19,6 +19,11 @@ def render_html_report(payload: dict[str, object]) -> str:
         for item in payload["evidence"]
     )
 
+    trace_events_html = "".join(
+        f"<li>{escape(event['event_type'])}</li>"
+        for event in payload.get("trace_events", [])
+    )
+
     return f"""
     <html>
         <body>
@@ -34,6 +39,10 @@ def render_html_report(payload: dict[str, object]) -> str:
             <section>
                 <h2>Evidence</h2>
                 {evidence_html}
+            </section>
+            <section>
+                <h2>Trace Events</h2>
+                <ul>{trace_events_html}</ul>
             </section>
         </body>
     </html>
