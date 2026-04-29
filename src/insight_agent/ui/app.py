@@ -89,6 +89,14 @@ if st.button("Preview Run"):
         st.subheader("Report Preview")
         st.write(f"Summary: {report['summary']}")
         st.write(f"HTML report: {report_path}")
+        html_report = report_path.read_text()
+
+        st.download_button(
+            "Download HTML report",
+            data=html_report,
+            file_name="preview-report.html",
+            mime="text/html",
+        )
 
         st.write("Findings:")
         for finding in report["findings"]:
