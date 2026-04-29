@@ -1,7 +1,6 @@
 from insight_agent.normalize.evidence import build_evidence_snippet
 
 
-
 def build_report_payload(
     summary: str,
     findings: list[str],
@@ -12,6 +11,7 @@ def build_report_payload(
         "findings": findings,
         "evidence": evidence,
     }
+
 
 def build_preview_report(
     query_spec: dict[str, object],
@@ -51,6 +51,19 @@ def build_preview_report(
         f"Article count: {article_count}",
     ]
 
+    sentiment_counts = {}
+
+    for article in articles:
+        sentiment = article["sentiment"]
+        sentiment_counts[sentiment] = sentiment_counts.get(sentiment, 0) + 1
+
+    sentiment_mix = ", ".join(
+        f"{sentiment}={count}"
+        for sentiment, count in sentiment_counts.items()
+    )
+
+    findings.append(f"Sentiment mix: {sentiment_mix}")
+
     evidence = []
 
     for article in articles:
@@ -60,8 +73,7 @@ def build_preview_report(
         snippet["title"] = article["title"]
         snippet["source_name"] = article["source_name"]
         snippet["url"] = article["url"]
-    
+
         evidence.append(snippet)
 
     return build_report_payload(summary, findings, evidence)
-

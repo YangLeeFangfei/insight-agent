@@ -290,4 +290,60 @@ def test_build_preview_report_attaches_evidence_source_metadata() -> None:
     assert evidence["source_name"] == "OpenAI"
     assert evidence["url"] == "https://example.com/openai-launch"
 
+def test_build_preview_report_includes_sentiment_mix_finding() -> None:
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT and Gemini sentiment in the last 30 days",
+            "companies": ["ChatGPT", "Gemini"],
+            "time_range": "30d",
+            "metrics": ["sentiment"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT and Gemini sentiment in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            },
+            {
+                "company": "Gemini",
+                "title": "Model update",
+                "source_name": "Google",
+                "source_type": "announcement",
+                "content": "Gemini announced a model update.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T11:00:00",
+                "url": "https://example.com/gemini-update",
+                "sentiment": "neutral",
+            },
+        ],
+    )
 
+    assert "Sentiment mix: positive=1, neutral=1" in payload["findings"]
