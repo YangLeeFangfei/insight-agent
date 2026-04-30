@@ -28,7 +28,7 @@ if st.button("Preview Run"):
     existing_rows = list_articles_for_companies(db_path, query_spec["companies"])
 
     if not existing_rows:
-        for article in collect_demo_articles():
+        for article in collect_demo_articles(query_spec["companies"]):
             insert_article(db_path, article)
 
     matching_articles = list_articles_for_companies(db_path, query_spec["companies"])
