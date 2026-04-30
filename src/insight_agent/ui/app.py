@@ -7,6 +7,7 @@ from insight_agent.agent.planner import parse_query
 from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
 from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
+from insight_agent.collectors.demo import collect_demo_articles
 
 
 st.set_page_config(page_title="Insight Agent", layout="wide")
@@ -27,32 +28,7 @@ if st.button("Preview Run"):
     existing_rows = list_articles_for_companies(db_path, query_spec["companies"])
 
     if not existing_rows:
-        sample_articles = [
-            {
-                "company": "ChatGPT",
-                "title": "Launch update",
-                "source_name": "OpenAI",
-                "source_type": "announcement",
-                "content": "OpenAI launched a new feature for enterprise teams.",
-                "published_date": "2026-04-20",
-                "collected_at": "2026-04-20T10:00:00",
-                "url": "https://example.com/openai-launch",
-                "sentiment": "positive",
-            },
-            {
-                "company": "Gemini",
-                "title": "Model update",
-                "source_name": "Google",
-                "source_type": "announcement",
-                "content": "Gemini announced a model update for developers.",
-                "published_date": "2026-04-20",
-                "collected_at": "2026-04-20T11:00:00",
-                "url": "https://example.com/gemini-update",
-                "sentiment": "neutral",
-            },
-        ]
-
-        for article in sample_articles:
+        for article in collect_demo_articles():
             insert_article(db_path, article)
 
     matching_articles = list_articles_for_companies(db_path, query_spec["companies"])
