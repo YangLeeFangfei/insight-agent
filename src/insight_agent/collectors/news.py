@@ -20,3 +20,26 @@ def build_news_api_params(
         "sortBy": "publishedAt",
         "apiKey": api_key,
     }
+
+def parse_news_api_articles(
+    response_json: dict[str, object],
+    company: str,
+) -> list[dict[str, str]]:
+    articles = []
+
+    for item in response_json.get("articles", []):
+        articles.append(
+            {
+                "company": company,
+                "title": item["title"],
+                "source_name": item["source"]["name"],
+                "source_type": "news",
+                "content": item["description"],
+                "published_date": item["publishedAt"],
+                "collected_at": item["publishedAt"],
+                "url": item["url"],
+                "sentiment": "neutral",
+            }
+        )
+
+    return articles
