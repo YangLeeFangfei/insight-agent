@@ -9,3 +9,14 @@ def collect_news_articles(request: CollectionRequest) -> list[dict[str, str]]:
         return []
 
     return []
+
+def build_news_api_params(
+    request: CollectionRequest,
+    api_key: str,
+) -> dict[str, str]:
+    return {
+        "q": " OR ".join(request.companies),
+        "language": "en",
+        "sortBy": "publishedAt",
+        "apiKey": api_key,
+    }
