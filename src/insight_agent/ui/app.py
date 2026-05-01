@@ -37,7 +37,7 @@ if st.button("Preview Run"):
     matching_articles = list_articles_for_companies(db_path, query_spec["companies"])
     article_records = [dict(row) for row in matching_articles]
 
-    run = initialize_run(query_spec)
+    run = initialize_run(query_spec, collection_request)
     report = build_preview_report(query_spec, run, article_records)
     report_path = write_html_report(
         report,

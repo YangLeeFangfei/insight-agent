@@ -1,6 +1,5 @@
 from insight_agent.agent.trace import build_trace_event
-
-
+from insight_agent.collectors.base import CollectionRequest
 
 def build_run_plan(query_spec: dict[str, object]) -> dict[str, object]:
     plan_preview = query_spec.get("plan_preview", {})
@@ -18,7 +17,8 @@ def build_run_plan(query_spec: dict[str, object]) -> dict[str, object]:
         ],
     }
 
-def initialize_run(query_spec: dict[str, object]) -> dict[str, object]:
+def initialize_run(query_spec: dict[str, object], collection_request: CollectionRequest | None = None,) -> dict[str, object]:
+
     plan = build_run_plan(query_spec)
 
     events = [
@@ -31,6 +31,18 @@ def initialize_run(query_spec: dict[str, object]) -> dict[str, object]:
             {"stages": plan["stages"]},
         ),
     ]
+
+    if collection_request is not None:
+        events.append(
+            build_trace_event(
+                "run.collection_requested",
+                {
+                    "companies": collection_request.companies,
+                    "time_range": collection_request.time_range,
+                    "source_types": collection_request.source_types,
+                },
+            )
+        )
 
     return {
         "plan": plan,
