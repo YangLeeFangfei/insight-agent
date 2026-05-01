@@ -29,6 +29,8 @@ def test_search_outputs_parsed_query_details() -> None:
     assert "run.started" in result.output
     assert "run.plan_generated" in result.output
     assert "run.collection_requested" in result.output
+    assert "run.collection_completed" in result.output
+
 
     
 
