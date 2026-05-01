@@ -48,3 +48,22 @@ def initialize_run(query_spec: dict[str, object], collection_request: Collection
         "plan": plan,
         "events": events,
     }
+
+def record_collection_completed(
+    run: dict[str, object],
+    articles: list[dict[str, str]],
+) -> dict[str, object]:
+    companies = sorted({article["company"] for article in articles})
+
+    run["events"].append(
+        build_trace_event(
+            "run.collection_completed",
+            {
+                "article_count": len(articles),
+                "companies": companies,
+            },
+        )
+    )
+
+    return run
+

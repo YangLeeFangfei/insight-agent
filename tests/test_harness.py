@@ -1,4 +1,8 @@
-from insight_agent.agent.harness import build_run_plan, initialize_run
+from insight_agent.agent.harness import (
+    build_run_plan,
+    initialize_run,
+    record_collection_completed,
+)
 from insight_agent.collectors.base import CollectionRequest
 
 
@@ -71,3 +75,36 @@ def test_initialize_run_records_collection_request() -> None:
         "announcement",
         "industry",
     ]
+
+def test_record_collection_completed_adds_trace_event() -> None:
+    query_spec = {
+        "raw_query": "Compare ChatGPT and Gemini in the last 30 days",
+        "companies": ["ChatGPT", "Gemini"],
+        "time_range": "30d",
+        "metrics": ["sentiment", "topics"],
+        "plan_preview": {
+            "needs_confirmation": True,
+            "source_types": ["news", "announcement", "industry"],
+        },
+    }
+    collection_request = CollectionRequest(
+        companies=["ChatGPT", "Gemini"],
+        time_range="30d",
+        source_types=["news", "announcement", "industry"],
+    )
+    run = initialize_run(query_spec, collection_request)
+
+    updated_run = record_collection_completed(
+        run,
+        [
+            {"company": "ChatGPT"},
+            {"company": "Gemini"},
+        ],
+    )
+
+    event = updated_run["events"][-1]
+
+    assert event["event_type"] == "run.collection_completed"
+    assert event["payload"]["article_count"] == 2
+    assert event["payload"]["companies"] == ["ChatGPT", "Gemini"]
+

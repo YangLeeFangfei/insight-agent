@@ -1,16 +1,14 @@
 from pathlib import Path
 
-
 import streamlit as st
 
-from insight_agent.agent.harness import initialize_run
 from insight_agent.agent.planner import parse_query
 from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
 from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
 from insight_agent.collectors.demo import collect_demo_articles
 from insight_agent.collectors.base import build_collection_request
-
+from insight_agent.agent.harness import initialize_run, record_collection_completed
 
 st.set_page_config(page_title="Insight Agent", layout="wide")
 st.title("Insight Agent")
@@ -38,6 +36,7 @@ if st.button("Preview Run"):
     article_records = [dict(row) for row in matching_articles]
 
     run = initialize_run(query_spec, collection_request)
+    run = record_collection_completed(run, article_records)
     report = build_preview_report(query_spec, run, article_records)
     report_path = write_html_report(
         report,
