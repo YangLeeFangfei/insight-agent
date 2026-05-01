@@ -2,7 +2,7 @@
 import click
 from insight_agent.agent.planner import parse_query
 from insight_agent.agent.harness import initialize_run
-
+from insight_agent.collectors.base import build_collection_request
 
 @click.group()
 def cli() -> None:
@@ -14,7 +14,8 @@ def cli() -> None:
 def search(query: str) -> None:
     """Echo the incoming query."""
     result = parse_query(query)
-    run = initialize_run(result)
+    collection_request = build_collection_request(result)
+    run = initialize_run(result, collection_request)
     
     click.echo(f"search query: {query}")
     click.echo(f"Companies:{', '.join(result['companies'])}")
