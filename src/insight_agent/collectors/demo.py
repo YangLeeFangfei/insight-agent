@@ -1,5 +1,6 @@
+from insight_agent.collectors.base import CollectionRequest
 
-def collect_demo_articles(companies: list[str] | None = None) -> list[dict[str, str]]:
+def collect_demo_articles(request: CollectionRequest | None = None) -> list[dict[str, str]]:
     articles = [
         {
             "company": "ChatGPT",
@@ -25,10 +26,11 @@ def collect_demo_articles(companies: list[str] | None = None) -> list[dict[str, 
         }
     ]
 
-    if not companies:
+    if request is None:
         return articles
     
-    company_set = set(companies)
+    company_set = set(request.companies)
+
     return [
         article
         for article in articles
