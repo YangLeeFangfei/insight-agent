@@ -6,7 +6,7 @@ from insight_agent.agent.planner import parse_query
 from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
 from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
-from insight_agent.collectors.demo import collect_demo_articles
+from insight_agent.collectors.selector import collect_articles
 from insight_agent.collectors.base import build_collection_request
 from insight_agent.agent.harness import initialize_run, record_collection_completed
 
@@ -29,7 +29,7 @@ if st.button("Preview Run"):
     existing_rows = list_articles_for_companies(db_path, query_spec["companies"])
 
     if not existing_rows:
-        for article in collect_demo_articles(collection_request):
+        for article in collect_articles(collection_request):
             insert_article(db_path, article)
 
     matching_articles = list_articles_for_companies(db_path, query_spec["companies"])
