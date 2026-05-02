@@ -21,3 +21,11 @@ def test_get_collector_mode_reads_environment(monkeypatch) -> None:
     monkeypatch.setenv("INSIGHT_COLLECTOR", "news")
 
     assert get_collector_mode() == "news"
+
+def test_get_news_api_key_reads_dotenv_file(monkeypatch, tmp_path) -> None:
+    dotenv_path = tmp_path / ".env"
+    dotenv_path.write_text("NEWS_API_KEY=dotenv-news-key\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("NEWS_API_KEY", raising=False)
+
+    assert get_news_api_key() == "dotenv-news-key"
