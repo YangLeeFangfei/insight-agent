@@ -7,7 +7,8 @@ from insight_agent.collectors.news import (
 import httpx
 
 
-def test_collect_news_articles_returns_empty_without_api_key(monkeypatch) -> None:
+def test_collect_news_articles_returns_empty_without_api_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("NEWS_API_KEY", raising=False)
     request = CollectionRequest(
         companies=["ChatGPT"],
@@ -21,14 +22,14 @@ def test_collect_news_articles_returns_empty_without_api_key(monkeypatch) -> Non
 
 def test_build_news_api_params_uses_collection_request() -> None:
     request = CollectionRequest(
-        companies=["ChatGPT", "Gemini"],
+        companies=["ChatGPT"],
         time_range="30d",
         source_types=["news"],
     )
 
     params = build_news_api_params(request, "test-news-key")
 
-    assert params["q"] == "ChatGPT OR Gemini"
+    assert params["q"] == "ChatGPT"
     assert params["language"] == "en"
     assert params["sortBy"] == "publishedAt"
     assert params["apiKey"] == "test-news-key"
@@ -98,6 +99,44 @@ def test_collect_news_articles_fetches_and_parses_articles(monkeypatch) -> None:
     assert articles[0]["company"] == "ChatGPT"
     assert articles[0]["title"] == "ChatGPT launches team feature"
 
+def test_collect_news_articles_fetches_each_company_separately(monkeypatch) -> None:
+    monkeypatch.setenv("NEWS_API_KEY", "test-news-key")
+    queries = []
+
+    def fake_get(url, params, timeout):
+        queries.append(params["q"])
+        company = params["q"]
+
+        return httpx.Response(
+            200,
+            json={
+                "articles": [
+                    {
+                        "title": f"{company} news",
+                        "source": {"name": "Example News"},
+                        "description": f"{company} product update.",
+                        "url": f"https://example.com/{company.lower()}",
+                        "publishedAt": "2026-04-30T10:00:00Z",
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    request = CollectionRequest(
+        companies=["ChatGPT", "Gemini"],
+        time_range="30d",
+        source_types=["news"],
+    )
+
+    articles = collect_news_articles(request)
+
+    assert queries == ["ChatGPT", "Gemini"]
+    assert len(articles) == 2
+    assert articles[0]["company"] == "ChatGPT"
+    assert articles[1]["company"] == "Gemini"
 
 
 

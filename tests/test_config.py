@@ -7,12 +7,14 @@ def test_get_news_api_key_reads_environment(monkeypatch) -> None:
     assert get_news_api_key() == "test-news-key"
 
 
-def test_get_news_api_key_returns_none_when_missing(monkeypatch) -> None:
+def test_get_news_api_key_returns_none_when_missing(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("NEWS_API_KEY", raising=False)
 
     assert get_news_api_key() is None
 
-def test_get_collector_mode_defaults_to_demo(monkeypatch) -> None:
+def test_get_collector_mode_defaults_to_demo(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("INSIGHT_COLLECTOR", raising=False)
 
     assert get_collector_mode() == "demo"

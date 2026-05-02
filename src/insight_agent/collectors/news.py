@@ -8,22 +8,32 @@ def collect_news_articles(request: CollectionRequest) -> list[dict[str, str]]:
 
     if api_key is None:
         return []
+    
+    articles = []
 
-    params = build_news_api_params(request, api_key)
-    response = httpx.get(
-        "https://newsapi.org/v2/everything",
-        params=params,
-        timeout=10,
-    )
-    response.raise_for_status()
-    return parse_news_api_articles(response.json(), request.companies[0])
+    for company in request.companies:
+        company_request = CollectionRequest(
+            companies=[company],
+            time_range=request.time_range,
+            source_types=request.source_types,   
+        )
+
+        params = build_news_api_params(company_request, api_key)
+        response = httpx.get(
+            "https://newsapi.org/v2/everything",
+            params=params,
+            timeout=10,
+        )
+        response.raise_for_status()
+        articles.extend(parse_news_api_articles(response.json(), company))
+    return articles
 
 def build_news_api_params(
     request: CollectionRequest,
     api_key: str,
 ) -> dict[str, str]:
     return {
-        "q": " OR ".join(request.companies),
+        "q": request.companies[0],
         "language": "en",
         "sortBy": "publishedAt",
         "apiKey": api_key,
