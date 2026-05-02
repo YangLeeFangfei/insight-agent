@@ -4,6 +4,7 @@ from insight_agent.collectors.news import (
     collect_news_articles,
     parse_news_api_articles,
 )
+import httpx
 
 
 def test_collect_news_articles_returns_empty_without_api_key(monkeypatch) -> None:
@@ -56,5 +57,47 @@ def test_parse_news_api_articles_maps_response_to_article_dict() -> None:
     assert articles[0]["published_date"] == "2026-04-30T10:00:00Z"
     assert articles[0]["url"] == "https://example.com/chatgpt-feature"
     assert articles[0]["sentiment"] == "neutral"
+
+
+def test_collect_news_articles_fetches_and_parses_articles(monkeypatch) -> None:
+    monkeypatch.setenv("NEWS_API_KEY", "test-news-key")
+
+    def fake_get(url, params, timeout):
+        assert url == "https://newsapi.org/v2/everything"
+        assert params["q"] == "ChatGPT"
+        assert params["apiKey"] == "test-news-key"
+        assert timeout == 10
+
+        return httpx.Response(
+            200,
+            json={
+                "articles": [
+                    {
+                        "title": "ChatGPT launches team feature",
+                        "source": {"name": "Example News"},
+                        "description": "ChatGPT added a feature for teams.",
+                        "url": "https://example.com/chatgpt-teams",
+                        "publishedAt": "2026-04-30T10:00:00Z",
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    request = CollectionRequest(
+        companies=["ChatGPT"],
+        time_range="30d",
+        source_types=["news"],
+    )
+
+    articles = collect_news_articles(request)
+
+    assert len(articles) == 1
+    assert articles[0]["company"] == "ChatGPT"
+    assert articles[0]["title"] == "ChatGPT launches team feature"
+
+
 
 

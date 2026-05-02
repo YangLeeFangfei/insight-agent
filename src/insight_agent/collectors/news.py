@@ -1,5 +1,6 @@
 from insight_agent.collectors.base import CollectionRequest
 from insight_agent.config import get_news_api_key
+import httpx
 
 
 def collect_news_articles(request: CollectionRequest) -> list[dict[str, str]]:
@@ -8,7 +9,14 @@ def collect_news_articles(request: CollectionRequest) -> list[dict[str, str]]:
     if api_key is None:
         return []
 
-    return []
+    params = build_news_api_params(request, api_key)
+    response = httpx.get(
+        "https://newsapi.org/v2/everything",
+        params=params,
+        timeout=10,
+    )
+    response.raise_for_status()
+    return parse_news_api_articles(response.json(), request.companies[0])
 
 def build_news_api_params(
     request: CollectionRequest,
