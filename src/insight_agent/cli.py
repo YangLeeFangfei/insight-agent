@@ -7,6 +7,7 @@ from pathlib import Path
 
 from insight_agent.collectors.selector import collect_articles
 from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
+from insight_agent.normalize.cleaner import normalize_article
 
 
 @click.group()
@@ -25,7 +26,8 @@ def search(query: str) -> None:
     existing_rows = list_articles_for_companies(db_path, result["companies"])
     if not existing_rows:
         for article in collect_articles(collection_request):
-            insert_article(db_path, article)
+            normalized_article = normalize_article(article)
+            insert_article(db_path, normalized_article)
     
     matching_articles = list_articles_for_companies(db_path, result["companies"])
     article_records = [dict(row) for row in matching_articles]
@@ -42,6 +44,8 @@ def search(query: str) -> None:
     click.echo(
         f"Trace events: {', '.join(event['event_type'] for event in run['events'])}"
     )
+    click.echo(f"Articles: {len(article_records)}")
+
 
 
 @cli.command()

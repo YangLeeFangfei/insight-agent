@@ -69,3 +69,25 @@ def test_repository_filters_articles_by_company(tmp_path) -> None:
     assert len(rows) == 1
     assert rows[0]["company"] == "ChatGPT"
 
+def test_repository_skips_duplicate_article_urls(tmp_path) -> None:
+    db_path = tmp_path / "insight.db"
+    init_db(db_path)
+
+    article = {
+        "company": "ChatGPT",
+        "title": "Launch update",
+        "source_name": "OpenAI",
+        "source_type": "announcement",
+        "content": "Product launch details",
+        "published_date": "2026-04-20",
+        "collected_at": "2026-04-20T10:00:00",
+        "url": "https://example.com/openai-launch",
+        "sentiment": "positive",
+    }
+
+    insert_article(db_path, article)
+    insert_article(db_path, article)
+
+    rows = list_articles(db_path)
+
+    assert len(rows) == 1

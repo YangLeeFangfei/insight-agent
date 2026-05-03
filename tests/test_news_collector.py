@@ -138,5 +138,84 @@ def test_collect_news_articles_fetches_each_company_separately(monkeypatch) -> N
     assert articles[0]["company"] == "ChatGPT"
     assert articles[1]["company"] == "Gemini"
 
+def test_parse_news_api_articles_skips_incomplete_articles() -> None:
+    response_json = {
+        "articles": [
+            {
+                "title": "Broken article",
+                "description": "Missing source.",
+                "url": "https://example.com/broken",
+                "publishedAt": "2026-04-30T10:00:00Z",
+            },
+            {
+                "title": "Valid article",
+                "source": {"name": "Example News"},
+                "description": None,
+                "url": "https://example.com/valid",
+                "publishedAt": "2026-04-30T11:00:00Z",
+            },
+        ]
+    }
 
+    articles = parse_news_api_articles(response_json, "ChatGPT")
 
+    assert len(articles) == 1
+    assert articles[0]["title"] == "Valid article"
+    assert articles[0]["content"] == ""
+
+def test_collect_news_articles_returns_empty_when_request_fails(monkeypatch) -> None:
+    monkeypatch.setenv("NEWS_API_KEY", "test-news-key")
+
+    def fake_get(url, params, timeout):
+        raise httpx.TimeoutException("request timed out")
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    request = CollectionRequest(
+        companies=["ChatGPT"],
+        time_range="30d",
+        source_types=["news"],
+    )
+
+    articles = collect_news_articles(request)
+
+    assert articles == []
+
+def test_collect_news_articles_continues_when_one_company_request_fails(monkeypatch) -> None:
+    monkeypatch.setenv("NEWS_API_KEY", "test-news-key")
+
+    def fake_get(url, params, timeout):
+        company = params["q"]
+
+        if company == "ChatGPT":
+            raise httpx.TimeoutException("request timed out")
+
+        return httpx.Response(
+            200,
+            json={
+                "articles": [
+                    {
+                        "title": "Gemini news",
+                        "source": {"name": "Example News"},
+                        "description": "Gemini product update.",
+                        "url": "https://example.com/gemini",
+                        "publishedAt": "2026-04-30T10:00:00Z",
+                    }
+                ]
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    request = CollectionRequest(
+        companies=["ChatGPT", "Gemini"],
+        time_range="30d",
+        source_types=["news"],
+    )
+
+    articles = collect_news_articles(request)
+
+    assert len(articles) == 1
+    assert articles[0]["company"] == "Gemini"
+    assert articles[0]["title"] == "Gemini news"

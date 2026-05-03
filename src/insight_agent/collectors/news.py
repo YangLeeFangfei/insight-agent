@@ -19,12 +19,16 @@ def collect_news_articles(request: CollectionRequest) -> list[dict[str, str]]:
         )
 
         params = build_news_api_params(company_request, api_key)
-        response = httpx.get(
-            "https://newsapi.org/v2/everything",
-            params=params,
-            timeout=10,
-        )
-        response.raise_for_status()
+        try:
+            response = httpx.get(
+                "https://newsapi.org/v2/everything",
+                params=params,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            continue
+
         articles.extend(parse_news_api_articles(response.json(), company))
     return articles
 
@@ -46,18 +50,35 @@ def parse_news_api_articles(
     articles = []
 
     for item in response_json.get("articles", []):
+        if not isinstance(item, dict):
+            continue
+
+        source = item.get("source")
+        if not isinstance(source, dict):
+            continue
+
+        title = item.get("title")
+        source_name = source.get("name")
+        url = item.get("url")
+        published_at = item.get("publishedAt")
+        content = item.get("description") or ""
+
+        if not title or not source_name or not url or not published_at:
+            continue
+
         articles.append(
             {
                 "company": company,
-                "title": item["title"],
-                "source_name": item["source"]["name"],
+                "title": title,
+                "source_name": source_name,
                 "source_type": "news",
-                "content": item["description"],
-                "published_date": item["publishedAt"],
-                "collected_at": item["publishedAt"],
-                "url": item["url"],
+                "content": content,
+                "published_date": published_at,
+                "collected_at": published_at,
+                "url": url,
                 "sentiment": "neutral",
             }
         )
 
     return articles
+

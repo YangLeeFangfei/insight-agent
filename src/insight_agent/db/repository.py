@@ -8,7 +8,8 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 def init_db(db_path: Path) -> None:
-    schema = Path("src/insight_agent/db/schema.sql").read_text()
+    schema_path = Path(__file__).with_name("schema.sql")
+    schema = schema_path.read_text()
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     with _connect(db_path) as conn:
@@ -18,7 +19,7 @@ def insert_article(db_path: Path, article: dict[str, str]) -> None:
     with _connect(db_path) as conn:
         conn.execute(
             '''
-            INSERT INTO articles (
+            INSERT OR IGNORE INTO articles (
                 company, title, source_name, source_type, content,
                 published_date, collected_at, url, sentiment
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
