@@ -395,3 +395,65 @@ def test_build_preview_report_includes_trace_events() -> None:
 
     assert payload["trace_events"][0]["event_type"] == "run.started"
     assert payload["trace_events"][1]["event_type"] == "run.plan_generated"
+
+def test_build_preview_report_prefers_llm_analysis_when_provided() -> None:
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT and Gemini sentiment in the last 30 days",
+            "companies": ["ChatGPT", "Gemini"],
+            "time_range": "30d",
+            "metrics": ["sentiment"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT and Gemini sentiment in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ],
+        llm_analysis={
+            "summary": "LLM summary: ChatGPT shows stronger product momentum.",
+            "findings": ["LLM finding: ChatGPT has more enterprise-facing updates."],
+            "risks": ["LLM risk: Evidence set is small."],
+            "citations": [
+                {
+                    "title": "Launch update",
+                    "url": "https://example.com/openai-launch",
+                }
+            ],
+        },
+    )
+
+    assert payload["summary"] == "LLM summary: ChatGPT shows stronger product momentum."
+    assert payload["findings"][0] == "LLM finding: ChatGPT has more enterprise-facing updates."
+    assert "LLM risk: Evidence set is small." in payload["findings"]
+    assert payload["evidence"][0]["title"] == "Launch update"
+    assert payload["evidence"][0]["url"] == "https://example.com/openai-launch"

@@ -9,4 +9,5 @@ python-dotenv>=1.0
 streamlit>=1.39
 pytest>=8.3
 ruff>=0.6
+openai>=2.0
 

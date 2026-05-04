@@ -6,8 +6,10 @@ from insight_agent.agent.harness import initialize_run, record_collection_comple
 from pathlib import Path
 
 from insight_agent.collectors.selector import collect_articles
-from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
-from insight_agent.normalize.cleaner import normalize_article
+from insight_agent.ingestion import load_or_collect_articles
+from insight_agent.llm.analyst import analyze_articles
+from insight_agent.reporting.builder import build_preview_report
+from insight_agent.llm.factory import build_llm_client
 
 
 @click.group()
@@ -16,21 +18,22 @@ def cli() -> None:
 
 
 @cli.command()
+@click.option("--refresh", is_flag=True)
+@click.option("--llm", is_flag=True)
 @click.argument("query")
-def search(query: str) -> None:
+def search(query: str, refresh: bool, llm: bool) -> None:
     """Echo the incoming query."""
     result = parse_query(query)
     collection_request = build_collection_request(result)
     db_path = Path("data/insight.db")
-    init_db(db_path)
-    existing_rows = list_articles_for_companies(db_path, result["companies"])
-    if not existing_rows:
-        for article in collect_articles(collection_request):
-            normalized_article = normalize_article(article)
-            insert_article(db_path, normalized_article)
-    
-    matching_articles = list_articles_for_companies(db_path, result["companies"])
-    article_records = [dict(row) for row in matching_articles]
+    ingestion_result = load_or_collect_articles(
+        db_path=db_path,
+        companies=result["companies"],
+        collection_request=collection_request,
+        collect_fn=collect_articles,
+        refresh=refresh,
+    )
+    article_records = ingestion_result.articles
     run = initialize_run(result, collection_request)
     run = record_collection_completed(run, article_records)
     click.echo(f"search query: {query}")
@@ -45,6 +48,34 @@ def search(query: str) -> None:
         f"Trace events: {', '.join(event['event_type'] for event in run['events'])}"
     )
     click.echo(f"Articles: {len(article_records)}")
+    click.echo(f"Used cache: {ingestion_result.used_cache}")
+    click.echo(f"Collected: {ingestion_result.collected_count}")
+    if llm:
+        llm_analysis = analyze_articles(
+            query_spec=result,
+            articles=article_records,
+            client=build_llm_client(),
+        )
+        report = build_preview_report(
+            result,
+            run,
+            article_records,
+            llm_analysis=llm_analysis,
+        )
+        click.echo(f"LLM summary: {report['summary']}")
+        click.echo("LLM findings:")
+        for finding in report["findings"]:
+            click.echo(f"- {finding}")
+
+        click.echo("LLM evidence:")
+        for evidence in report["evidence"]:
+            title = evidence.get("title", "Untitled evidence")
+            url = evidence.get("url", "")
+            click.echo(f"- {title}: {url}")
+
+
+
+
 
 
 

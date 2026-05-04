@@ -17,7 +17,32 @@ def build_preview_report(
     query_spec: dict[str, object],
     run: dict[str, object],
     articles: list[dict[str, str]] | None = None,
+    llm_analysis: dict[str, object] | None = None,
 ) -> dict[str, object]:
+    if llm_analysis is not None:
+        findings = list(llm_analysis["findings"])
+        findings.extend(llm_analysis.get("risks", []))
+
+        evidence = []
+        for citation in llm_analysis.get("citations", []):
+            evidence.append(
+                {
+                    "title": citation["title"],
+                    "url": citation["url"],
+                    "snippet_text": citation["title"],
+                    "snippet_start": 0,
+                    "snippet_end": len(citation["title"]),
+                }
+            )
+
+        payload = build_report_payload(
+            summary=llm_analysis["summary"],
+            findings=findings,
+            evidence=evidence,
+        )
+        payload["trace_events"] = run["events"]
+        return payload
+
     if not articles:
         companies = ", ".join(query_spec["companies"])
         metrics = ", ".join(query_spec["metrics"])

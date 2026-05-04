@@ -3,12 +3,14 @@ from pathlib import Path
 import streamlit as st
 
 from insight_agent.agent.planner import parse_query
-from insight_agent.db.repository import init_db, insert_article, list_articles_for_companies
 from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
 from insight_agent.collectors.selector import collect_articles
 from insight_agent.collectors.base import build_collection_request
 from insight_agent.agent.harness import initialize_run, record_collection_completed
+from insight_agent.ingestion import load_or_collect_articles
+from insight_agent.llm.analyst import analyze_articles
+from insight_agent.llm.factory import build_llm_client
 
 st.set_page_config(page_title="Insight Agent", layout="wide")
 st.title("Insight Agent")
@@ -18,26 +20,38 @@ query = st.text_area(
     "Query",
     "Compare ChatGPT and Gemini sentiment and topics in the last 30 days",
 )
+force_refresh = st.checkbox("Force refresh")
+use_llm = st.checkbox("Use LLM analysis")
 
 if st.button("Preview Run"):
     query_spec = parse_query(query)
     collection_request = build_collection_request(query_spec)
 
     db_path = Path("data/insight.db")
-    init_db(db_path)
-
-    existing_rows = list_articles_for_companies(db_path, query_spec["companies"])
-
-    if not existing_rows:
-        for article in collect_articles(collection_request):
-            insert_article(db_path, article)
-
-    matching_articles = list_articles_for_companies(db_path, query_spec["companies"])
-    article_records = [dict(row) for row in matching_articles]
-
+    ingestion_result = load_or_collect_articles(
+        db_path=db_path,
+        companies=query_spec["companies"],
+        collection_request=collection_request,
+        collect_fn=collect_articles,
+        refresh=force_refresh,
+    )
+    article_records = ingestion_result.articles
     run = initialize_run(query_spec, collection_request)
     run = record_collection_completed(run, article_records)
-    report = build_preview_report(query_spec, run, article_records)
+    llm_analysis = None
+    if use_llm:
+        llm_analysis = analyze_articles(
+            query_spec=query_spec,
+            articles=article_records,
+            client=build_llm_client(),
+        )
+
+    report = build_preview_report(
+        query_spec,
+        run,
+        article_records,
+        llm_analysis=llm_analysis,
+    )
     report_path = write_html_report(
         report,
         Path("data/reports/preview-report.html"),
@@ -57,6 +71,11 @@ if st.button("Preview Run"):
         st.subheader("Run Plan")
         st.write(f"Needs confirmation: {run['plan']['needs_confirmation']}")
         st.write(f"Stages: {', '.join(run['plan']['stages'])}")
+        st.subheader("Ingestion")
+        st.write(f"Used cache: {ingestion_result.used_cache}")
+        st.write(f"Collected: {ingestion_result.collected_count}")
+        st.write(f"Articles: {len(article_records)}")
+
 
     with right_col:
 
@@ -82,12 +101,18 @@ if st.button("Preview Run"):
 
         st.write("Evidence:")
         for item in report["evidence"]:
-            st.write(f"- {item['company']} / {item['source_name']}: {item['title']}")
-            st.write(item["snippet_text"])
-            st.write(item["url"])
+            company = item.get("company", "Unknown company")
+            source_name = item.get("source_name", "Unknown source")
+            title = item.get("title", "Untitled evidence")
+            url = item.get("url", "")
+            snippet_text = item.get("snippet_text", "")
+
+            st.write(f"- {company} / {source_name}: {title}")
+            st.write(snippet_text)
+            st.write(url)
 
         st.subheader("Matching Articles")
-        for row in matching_articles:
+        for row in article_records:
             st.write(f"- {row['company']}: {row['title']}")
 
 else:
