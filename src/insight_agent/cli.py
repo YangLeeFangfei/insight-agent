@@ -2,7 +2,6 @@
 import click
 from insight_agent.agent.planner import parse_query
 from insight_agent.collectors.base import build_collection_request
-from insight_agent.agent.harness import initialize_run, record_collection_completed
 from pathlib import Path
 
 from insight_agent.collectors.selector import collect_articles
@@ -10,6 +9,14 @@ from insight_agent.ingestion import load_or_collect_articles
 from insight_agent.llm.analyst import analyze_articles
 from insight_agent.reporting.builder import build_preview_report
 from insight_agent.llm.factory import build_llm_client
+from insight_agent.agent.harness import (
+    initialize_run,
+    record_collection_completed,
+    record_analysis_completed,
+    record_report_completed,
+    record_run_failed,
+)
+
 
 
 @click.group()
@@ -19,10 +26,11 @@ def cli() -> None:
 
 @cli.command()
 @click.option("--refresh", is_flag=True)
-@click.option("--llm", is_flag=True)
+@click.option("--no-llm", is_flag=True)
 @click.argument("query")
-def search(query: str, refresh: bool, llm: bool) -> None:
+def search(query: str, refresh: bool, no_llm: bool) -> None:
     """Echo the incoming query."""
+    use_llm = not no_llm
     result = parse_query(query)
     collection_request = build_collection_request(result)
     db_path = Path("data/insight.db")
@@ -44,24 +52,37 @@ def search(query: str, refresh: bool, llm: bool) -> None:
         f"Source types: {', '.join(result['plan_preview']['source_types'])}"
     )
     click.echo(f"Run stages: {', '.join(run['plan']['stages'])}")
-    click.echo(
-        f"Trace events: {', '.join(event['event_type'] for event in run['events'])}"
-    )
     click.echo(f"Articles: {len(article_records)}")
     click.echo(f"Used cache: {ingestion_result.used_cache}")
     click.echo(f"Collected: {ingestion_result.collected_count}")
-    if llm:
-        llm_analysis = analyze_articles(
-            query_spec=result,
-            articles=article_records,
-            client=build_llm_client(),
-        )
-        report = build_preview_report(
-            result,
-            run,
-            article_records,
-            llm_analysis=llm_analysis,
-        )
+
+    llm_analysis = None
+    if use_llm:
+        try:
+            llm_analysis = analyze_articles(
+                query_spec=result,
+                articles=article_records,
+                client=build_llm_client(),
+            )
+        except Exception as exc:
+            run = record_run_failed(run, "analysis", str(exc))
+            click.echo(f"Run status: {run['status']}")
+            click.echo(
+                f"Trace events: {', '.join(event['event_type'] for event in run['events'])}"
+            )
+            raise click.ClickException(f"LLM analysis failed: {exc}") from exc
+
+        run = record_analysis_completed(run, llm_analysis)
+
+    report = build_preview_report(
+        result,
+        run,
+        article_records,
+        llm_analysis=llm_analysis,
+    )
+    run = record_report_completed(run, report)
+
+    if use_llm:
         click.echo(f"LLM summary: {report['summary']}")
         click.echo("LLM findings:")
         for finding in report["findings"]:
@@ -72,6 +93,13 @@ def search(query: str, refresh: bool, llm: bool) -> None:
             title = evidence.get("title", "Untitled evidence")
             url = evidence.get("url", "")
             click.echo(f"- {title}: {url}")
+
+    click.echo(f"Run status: {run['status']}")
+    click.echo(
+        f"Trace events: {', '.join(event['event_type'] for event in run['events'])}"
+    )
+
+
 
 
 

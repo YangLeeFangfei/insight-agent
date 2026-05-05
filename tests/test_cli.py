@@ -1,4 +1,5 @@
 from click.testing import CliRunner
+import pytest
 
 from insight_agent.cli import cli
 from pathlib import Path
@@ -9,6 +10,13 @@ from insight_agent.db.repository import (
 )
 from insight_agent.llm.factory import FakeLLMClient, build_llm_client
 from insight_agent.llm.client import OpenAICompatibleLLMClient
+
+
+@pytest.fixture(autouse=True)
+def clear_llm_environment(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
 
 
 
@@ -24,10 +32,11 @@ def test_cli_help_shows_commands() -> None:
 def test_search_outputs_parsed_query_details() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(
-        cli,
-        ["search", "Compare ChatGPT and Gemini sentiment and topics in the last 30 days"],
-    )
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            ["search", "Compare ChatGPT and Gemini sentiment and topics in the last 30 days"],
+        )
 
     assert result.exit_code == 0
     assert "ChatGPT" in result.output
@@ -39,7 +48,10 @@ def test_search_outputs_parsed_query_details() -> None:
     assert "run.plan_generated" in result.output
     assert "run.collection_requested" in result.output
     assert "run.collection_completed" in result.output
+    assert "run.analysis_completed" in result.output
     assert "Articles:" in result.output
+    assert "run.report_completed" in result.output
+    assert "Run status: report_completed" in result.output
 
 
 
@@ -135,7 +147,7 @@ def test_cli_search_uses_ingestion_pipeline() -> None:
     assert "load_or_collect_articles" in cli_source
     assert "collect_fn=collect_articles" in cli_source
 
-def test_search_llm_outputs_structured_llm_report(monkeypatch) -> None:
+def test_search_outputs_structured_llm_report_by_default(monkeypatch) -> None:
     runner = CliRunner()
 
     def fake_collect_articles(collection_request):
@@ -160,7 +172,6 @@ def test_search_llm_outputs_structured_llm_report(monkeypatch) -> None:
             cli,
             [
                 "search",
-                "--llm",
                 "Compare ChatGPT sentiment in the last 30 days",
             ],
         )
@@ -172,11 +183,91 @@ def test_search_llm_outputs_structured_llm_report(monkeypatch) -> None:
     assert "- LLM risk: Evidence set is small." in result.output
     assert "LLM evidence:" in result.output
     assert "- Launch update: https://example.com/openai-launch" in result.output
+    assert "run.analysis_completed" in result.output
+    assert "Run status: report_completed" in result.output
+    assert "run.report_completed" in result.output
+
+
+def test_search_no_llm_skips_llm_analysis(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_collect_articles(collection_request):
+        return [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ]
+
+    monkeypatch.setattr("insight_agent.cli.collect_articles", fake_collect_articles)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "--no-llm",
+                "Compare ChatGPT sentiment in the last 30 days",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "LLM summary:" not in result.output
+    assert "run.analysis_completed" not in result.output
+    assert "run.report_completed" in result.output
+    assert "Run status: report_completed" in result.output
+
+
+def test_search_records_failed_run_when_default_llm_analysis_raises(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_collect_articles(collection_request):
+        return [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ]
+
+    def fake_analyze_articles(query_spec, articles, client):
+        raise RuntimeError("model timeout")
+
+    monkeypatch.setattr("insight_agent.cli.collect_articles", fake_collect_articles)
+    monkeypatch.setattr("insight_agent.cli.analyze_articles", fake_analyze_articles)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "Compare ChatGPT sentiment in the last 30 days",
+            ],
+        )
+
+    assert result.exit_code == 1
+    assert "Run status: failed" in result.output
+    assert "run.failed" in result.output
+    assert "LLM analysis failed: model timeout" in result.output
+
+
 
 
 def test_build_llm_client_returns_fake_client_without_api_key(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
 
     client = build_llm_client()
 
@@ -192,4 +283,3 @@ def test_build_llm_client_returns_openai_compatible_client_with_api_key(monkeypa
 
     assert isinstance(client, OpenAICompatibleLLMClient)
     assert client.model == "mimo-v2.5"
-

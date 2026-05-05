@@ -108,3 +108,26 @@ def test_render_html_report_includes_trace_events() -> None:
     assert "Trace Events" in html
     assert "run.started" in html
     assert "run.plan_generated" in html
+
+
+def test_render_html_report_handles_llm_citation_evidence() -> None:
+    html = render_html_report(
+        {
+            "summary": "LLM summary.",
+            "findings": ["LLM finding."],
+            "evidence": [
+                {
+                    "title": "Launch update",
+                    "url": "https://example.com/openai-launch",
+                    "snippet_text": "Launch update",
+                    "snippet_start": 0,
+                    "snippet_end": 13,
+                }
+            ],
+        }
+    )
+
+    assert "Unknown company" in html
+    assert "Unknown source" in html
+    assert "Launch update" in html
+    assert "https://example.com/openai-launch" in html

@@ -43,8 +43,14 @@ def initialize_run(query_spec: dict[str, object], collection_request: Collection
                 },
             )
         )
+    
+    status = "planned"
+
+    if collection_request is not None:
+        status = "collection_requested"
 
     return {
+        "status": status,
         "plan": plan,
         "events": events,
     }
@@ -64,6 +70,67 @@ def record_collection_completed(
             },
         )
     )
+    run["status"] = "collection_completed"
 
     return run
 
+def record_analysis_completed(
+    run: dict[str, object],
+    analysis: dict[str, object],
+) -> dict[str, object]:
+    findings = analysis.get("findings", [])
+    citations = analysis.get("citations", [])
+
+    run["events"].append(
+        build_trace_event(
+            "run.analysis_completed",
+            {
+                "summary": analysis.get("summary", ""),
+                "finding_count": len(findings),
+                "citation_count": len(citations),
+            },
+        )
+    )
+    run["status"] = "analysis_completed"
+
+    return run
+
+def record_report_completed(
+    run: dict[str, object],
+    report: dict[str, object],
+) -> dict[str, object]:
+    findings = report.get("findings", [])
+    evidence = report.get("evidence", [])
+
+    run["events"].append(
+        build_trace_event(
+            "run.report_completed",
+            {
+                "summary": report.get("summary", ""),
+                "finding_count": len(findings),
+                "evidence_count": len(evidence),
+            },
+        )
+    )
+    run["status"] = "report_completed"
+
+    return run
+
+
+def record_run_failed(
+    run: dict[str, object],
+    stage: str,
+    error_message: str,
+) -> dict[str, object]:
+    run["events"].append(
+        build_trace_event(
+            "run.failed",
+            {
+                "stage": stage,
+                "error_message": error_message,
+            },
+        )
+    )
+    run["status"] = "failed"
+
+    return run

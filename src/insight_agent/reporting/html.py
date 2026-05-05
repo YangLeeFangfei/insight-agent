@@ -8,16 +8,25 @@ def render_html_report(payload: dict[str, object]) -> str:
         for finding in payload["findings"]
     )
 
-    evidence_html = "".join(
-        f"""
-        <article>
-            <h3>{escape(item["company"])}: {escape(item["title"])}</h3>
-            <p>{escape(item["snippet_text"])}</p>
-            <a href="{escape(item["url"])}">{escape(item["source_name"])}</a>
-        </article>
-        """
-        for item in payload["evidence"]
-    )
+    evidence_items = []
+    for item in payload["evidence"]:
+        company = item.get("company", "Unknown company")
+        title = item.get("title", "Untitled evidence")
+        snippet_text = item.get("snippet_text", "")
+        url = item.get("url", "")
+        source_name = item.get("source_name", "Unknown source")
+
+        evidence_items.append(
+            f"""
+            <article>
+                <h3>{escape(company)}: {escape(title)}</h3>
+                <p>{escape(snippet_text)}</p>
+                <a href="{escape(url)}">{escape(source_name)}</a>
+            </article>
+            """
+        )
+
+    evidence_html = "".join(evidence_items)
 
     trace_events_html = "".join(
         f"<li>{escape(event['event_type'])}</li>"
