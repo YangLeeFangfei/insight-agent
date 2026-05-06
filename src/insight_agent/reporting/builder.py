@@ -23,23 +23,49 @@ def build_preview_report(
         findings = list(llm_analysis["findings"])
         findings.extend(llm_analysis.get("risks", []))
 
+        articles_by_url = {
+            article["url"]: article
+            for article in articles or []
+        }
         evidence = []
+        ungrounded_citation_count = 0
+        duplicate_citation_count = 0
+        seen_citation_urls = set()
         for citation in llm_analysis.get("citations", []):
-            evidence.append(
-                {
-                    "title": citation["title"],
-                    "url": citation["url"],
-                    "snippet_text": citation["title"],
-                    "snippet_start": 0,
-                    "snippet_end": len(citation["title"]),
-                }
+            citation_url = citation["url"]
+            if citation_url in seen_citation_urls:
+                duplicate_citation_count += 1
+                continue
+
+            seen_citation_urls.add(citation_url)
+            article = articles_by_url.get(citation_url)
+            if article is None:
+                ungrounded_citation_count += 1
+                continue
+
+            snippet = build_evidence_snippet(
+                article["content"],
+                article["company"],
             )
+            snippet["company"] = article["company"]
+            snippet["title"] = article["title"]
+            snippet["source_name"] = article["source_name"]
+            snippet["url"] = article["url"]
+            evidence.append(snippet)
+
+        if ungrounded_citation_count:
+            findings.append(f"Ungrounded citations dropped: {ungrounded_citation_count}")
 
         payload = build_report_payload(
             summary=llm_analysis["summary"],
             findings=findings,
             evidence=evidence,
         )
+        payload["evidence_summary"] = {
+            "grounded_citations": len(evidence),
+            "ungrounded_citations": ungrounded_citation_count,
+            "duplicate_citations": duplicate_citation_count,
+        }
         payload["trace_events"] = run["events"]
         return payload
 

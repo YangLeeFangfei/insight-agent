@@ -457,3 +457,145 @@ def test_build_preview_report_prefers_llm_analysis_when_provided() -> None:
     assert "LLM risk: Evidence set is small." in payload["findings"]
     assert payload["evidence"][0]["title"] == "Launch update"
     assert payload["evidence"][0]["url"] == "https://example.com/openai-launch"
+
+
+def test_build_preview_report_grounds_llm_citations_to_article_records() -> None:
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT sentiment in the last 30 days",
+            "companies": ["ChatGPT"],
+            "time_range": "30d",
+            "metrics": ["sentiment"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT sentiment in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ],
+        llm_analysis={
+            "summary": "LLM summary.",
+            "findings": ["LLM finding."],
+            "risks": [],
+            "citations": [
+                {
+                    "title": "Hallucinated source",
+                    "url": "https://example.com/not-collected",
+                },
+                {
+                    "title": "Launch update",
+                    "url": "https://example.com/openai-launch",
+                },
+            ],
+        },
+    )
+
+    assert len(payload["evidence"]) == 1
+    assert payload["evidence"][0]["company"] == "ChatGPT"
+    assert payload["evidence"][0]["source_name"] == "OpenAI"
+    assert payload["evidence"][0]["title"] == "Launch update"
+    assert payload["evidence"][0]["url"] == "https://example.com/openai-launch"
+    assert payload["evidence"][0]["snippet_text"] == "ChatGPT launched a new enterprise feature."
+    assert "Ungrounded citations dropped: 1" in payload["findings"]
+
+
+def test_build_preview_report_deduplicates_grounded_llm_citations_by_url() -> None:
+    payload = build_preview_report(
+        {
+            "raw_query": "Compare ChatGPT sentiment in the last 30 days",
+            "companies": ["ChatGPT"],
+            "time_range": "30d",
+            "metrics": ["sentiment"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        },
+        {
+            "plan": {
+                "query": "Compare ChatGPT sentiment in the last 30 days",
+                "needs_confirmation": True,
+                "stages": [
+                    "plan_preview",
+                    "source_collection",
+                    "normalization",
+                    "analysis",
+                    "evidence_binding",
+                    "reporting",
+                ],
+            },
+            "events": [
+                {"event_type": "run.started", "payload": {}},
+                {"event_type": "run.plan_generated", "payload": {}},
+            ],
+        },
+        [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ],
+        llm_analysis={
+            "summary": "LLM summary.",
+            "findings": ["LLM finding."],
+            "risks": [],
+            "citations": [
+                {
+                    "title": "Launch update",
+                    "url": "https://example.com/openai-launch",
+                },
+                {
+                    "title": "Launch update duplicate",
+                    "url": "https://example.com/openai-launch",
+                },
+                {
+                    "title": "Hallucinated source",
+                    "url": "https://example.com/not-collected",
+                },
+            ],
+        },
+    )
+
+    assert len(payload["evidence"]) == 1
+    assert payload["evidence"][0]["url"] == "https://example.com/openai-launch"
+    assert payload["evidence_summary"] == {
+        "grounded_citations": 1,
+        "ungrounded_citations": 1,
+        "duplicate_citations": 1,
+    }

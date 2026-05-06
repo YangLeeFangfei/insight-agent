@@ -123,6 +123,19 @@ if st.button("Preview Run"):
             for finding in report["findings"]:
                 st.write(f"- {finding}")
 
+            evidence_summary = report.get("evidence_summary")
+            if evidence_summary is not None:
+                st.write("Evidence quality:")
+                st.write(
+                    f"- Grounded citations: {evidence_summary['grounded_citations']}"
+                )
+                st.write(
+                    f"- Ungrounded citations: {evidence_summary['ungrounded_citations']}"
+                )
+                st.write(
+                    f"- Duplicate citations: {evidence_summary['duplicate_citations']}"
+                )
+
             st.write("Evidence:")
             for item in report["evidence"]:
                 company = item.get("company", "Unknown company")
