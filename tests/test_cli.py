@@ -183,9 +183,67 @@ def test_search_outputs_structured_llm_report_by_default(monkeypatch) -> None:
     assert "- LLM risk: Evidence set is small." in result.output
     assert "LLM evidence:" in result.output
     assert "- Launch update: https://example.com/openai-launch" in result.output
+    assert "Evidence quality:" in result.output
+    assert "Grounded citations: 1" in result.output
+    assert "Ungrounded citations: 0" in result.output
+    assert "Duplicate citations: 0" in result.output
     assert "run.analysis_completed" in result.output
     assert "Run status: report_completed" in result.output
     assert "run.report_completed" in result.output
+
+
+def test_search_defaults_missing_evidence_quality_counts(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_collect_articles(collection_request):
+        return [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ]
+
+    def fake_build_preview_report(
+        query_spec,
+        run,
+        articles,
+        llm_analysis=None,
+    ):
+        return {
+            "summary": "LLM summary.",
+            "findings": [],
+            "evidence": [],
+            "evidence_summary": {
+                "grounded_citations": 1,
+            },
+        }
+
+    monkeypatch.setattr("insight_agent.cli.collect_articles", fake_collect_articles)
+    monkeypatch.setattr(
+        "insight_agent.cli.build_preview_report",
+        fake_build_preview_report,
+    )
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "Compare ChatGPT sentiment in the last 30 days",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "Grounded citations: 1" in result.output
+    assert "Ungrounded citations: 0" in result.output
+    assert "Duplicate citations: 0" in result.output
 
 
 def test_search_no_llm_skips_llm_analysis(monkeypatch) -> None:

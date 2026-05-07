@@ -1,5 +1,6 @@
 from insight_agent.agent.trace import build_trace_event
 from insight_agent.collectors.base import CollectionRequest
+from insight_agent.reporting.evidence_quality import normalize_evidence_summary
 
 def build_run_plan(query_spec: dict[str, object]) -> dict[str, object]:
     plan_preview = query_spec.get("plan_preview", {})
@@ -101,6 +102,7 @@ def record_report_completed(
 ) -> dict[str, object]:
     findings = report.get("findings", [])
     evidence = report.get("evidence", [])
+    evidence_summary = normalize_evidence_summary(report.get("evidence_summary"))
 
     run["events"].append(
         build_trace_event(
@@ -109,6 +111,9 @@ def record_report_completed(
                 "summary": report.get("summary", ""),
                 "finding_count": len(findings),
                 "evidence_count": len(evidence),
+                "grounded_citation_count": evidence_summary["grounded_citations"],
+                "ungrounded_citation_count": evidence_summary["ungrounded_citations"],
+                "duplicate_citation_count": evidence_summary["duplicate_citations"],
             },
         )
     )

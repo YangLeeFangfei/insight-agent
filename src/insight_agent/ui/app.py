@@ -10,6 +10,7 @@ from insight_agent.collectors.base import build_collection_request
 from insight_agent.ingestion import load_or_collect_articles
 from insight_agent.llm.analyst import analyze_articles
 from insight_agent.llm.factory import build_llm_client
+from insight_agent.reporting.evidence_quality import normalize_evidence_summary
 from insight_agent.agent.harness import (
     initialize_run,
     record_collection_completed,
@@ -125,15 +126,16 @@ if st.button("Preview Run"):
 
             evidence_summary = report.get("evidence_summary")
             if evidence_summary is not None:
+                evidence_quality = normalize_evidence_summary(evidence_summary)
                 st.write("Evidence quality:")
                 st.write(
-                    f"- Grounded citations: {evidence_summary['grounded_citations']}"
+                    f"- Grounded citations: {evidence_quality['grounded_citations']}"
                 )
                 st.write(
-                    f"- Ungrounded citations: {evidence_summary['ungrounded_citations']}"
+                    f"- Ungrounded citations: {evidence_quality['ungrounded_citations']}"
                 )
                 st.write(
-                    f"- Duplicate citations: {evidence_summary['duplicate_citations']}"
+                    f"- Duplicate citations: {evidence_quality['duplicate_citations']}"
                 )
 
             st.write("Evidence:")

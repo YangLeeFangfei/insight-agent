@@ -8,6 +8,7 @@ from insight_agent.collectors.selector import collect_articles
 from insight_agent.ingestion import load_or_collect_articles
 from insight_agent.llm.analyst import analyze_articles
 from insight_agent.reporting.builder import build_preview_report
+from insight_agent.reporting.evidence_quality import normalize_evidence_summary
 from insight_agent.llm.factory import build_llm_client
 from insight_agent.agent.harness import (
     initialize_run,
@@ -93,6 +94,14 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
             title = evidence.get("title", "Untitled evidence")
             url = evidence.get("url", "")
             click.echo(f"- {title}: {url}")
+
+        evidence_summary = report.get("evidence_summary")
+        if evidence_summary is not None:
+            evidence_quality = normalize_evidence_summary(evidence_summary)
+            click.echo("Evidence quality:")
+            click.echo(f"Grounded citations: {evidence_quality['grounded_citations']}")
+            click.echo(f"Ungrounded citations: {evidence_quality['ungrounded_citations']}")
+            click.echo(f"Duplicate citations: {evidence_quality['duplicate_citations']}")
 
     click.echo(f"Run status: {run['status']}")
     click.echo(

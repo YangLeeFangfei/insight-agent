@@ -196,6 +196,11 @@ def test_record_report_completed_adds_trace_event_and_status() -> None:
             "evidence": [
                 {"title": "Evidence one"},
             ],
+            "evidence_summary": {
+                "grounded_citations": 1,
+                "ungrounded_citations": 2,
+                "duplicate_citations": 3,
+            },
         },
     )
 
@@ -205,6 +210,9 @@ def test_record_report_completed_adds_trace_event_and_status() -> None:
     assert event["payload"]["summary"] == "Report summary."
     assert event["payload"]["finding_count"] == 2
     assert event["payload"]["evidence_count"] == 1
+    assert event["payload"]["grounded_citation_count"] == 1
+    assert event["payload"]["ungrounded_citation_count"] == 2
+    assert event["payload"]["duplicate_citation_count"] == 3
     assert updated_run["status"] == "report_completed"
 
 
