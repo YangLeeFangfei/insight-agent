@@ -1,4 +1,5 @@
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -56,3 +57,48 @@ def list_articles_for_companies(db_path: Path, companies: list[str], ) -> list[s
                 tuple(companies),
             )
         )
+
+
+def save_run(db_path: Path, run: dict[str, object]) -> None:
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO runs (
+                run_id, status, query, plan_json, events_json
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(run_id) DO UPDATE SET
+                status = excluded.status,
+                query = excluded.query,
+                plan_json = excluded.plan_json,
+                events_json = excluded.events_json
+            """,
+            (
+                run["run_id"],
+                run["status"],
+                run["plan"]["query"],
+                json.dumps(run["plan"]),
+                json.dumps(run["events"]),
+            ),
+        )
+
+
+def get_run(db_path: Path, run_id: str) -> dict[str, object] | None:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT run_id, status, query, plan_json, events_json
+            FROM runs
+            WHERE run_id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "run_id": row["run_id"],
+        "status": row["status"],
+        "plan": json.loads(row["plan_json"]),
+        "events": json.loads(row["events_json"]),
+    }

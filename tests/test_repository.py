@@ -1,8 +1,10 @@
 from insight_agent.db.repository import (
+    get_run,
     init_db,
     insert_article,
     list_articles,
     list_articles_for_companies,
+    save_run,
 )
 
 
@@ -91,3 +93,40 @@ def test_repository_skips_duplicate_article_urls(tmp_path) -> None:
     rows = list_articles(db_path)
 
     assert len(rows) == 1
+
+
+def test_repository_saves_and_reads_run_state(tmp_path) -> None:
+    db_path = tmp_path / "insight.db"
+    init_db(db_path)
+
+    run = {
+        "run_id": "run_test",
+        "status": "report_completed",
+        "plan": {
+            "query": "Compare ChatGPT sentiment in the last 30 days",
+            "stages": ["analysis", "reporting"],
+        },
+        "events": [
+            {
+                "event_type": "run.started",
+                "payload": {
+                    "run_id": "run_test",
+                    "query": "Compare ChatGPT sentiment in the last 30 days",
+                },
+            },
+            {
+                "event_type": "run.report_completed",
+                "payload": {
+                    "evidence_count": 1,
+                },
+            },
+        ],
+    }
+
+    save_run(db_path, run)
+    saved_run = get_run(db_path, "run_test")
+
+    assert saved_run["run_id"] == "run_test"
+    assert saved_run["status"] == "report_completed"
+    assert saved_run["plan"]["query"] == "Compare ChatGPT sentiment in the last 30 days"
+    assert saved_run["events"][1]["event_type"] == "run.report_completed"

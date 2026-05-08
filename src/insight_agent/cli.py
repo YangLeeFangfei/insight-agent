@@ -1,7 +1,10 @@
 
+import json
+
 import click
 from insight_agent.agent.planner import parse_query
 from insight_agent.collectors.base import build_collection_request
+from insight_agent.db.repository import get_run, save_run
 from pathlib import Path
 
 from insight_agent.collectors.selector import collect_articles
@@ -45,6 +48,8 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
     article_records = ingestion_result.articles
     run = initialize_run(result, collection_request)
     run = record_collection_completed(run, article_records)
+    save_run(db_path, run)
+    click.echo(f"Run ID: {run['run_id']}")
     click.echo(f"search query: {query}")
     click.echo(f"Companies:{', '.join(result['companies'])}")
     click.echo(f"Time range: {result['time_range']}")
@@ -67,6 +72,7 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
             )
         except Exception as exc:
             run = record_run_failed(run, "analysis", str(exc))
+            save_run(db_path, run)
             click.echo(f"Run status: {run['status']}")
             click.echo(
                 f"Trace events: {', '.join(event['event_type'] for event in run['events'])}"
@@ -74,6 +80,7 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
             raise click.ClickException(f"LLM analysis failed: {exc}") from exc
 
         run = record_analysis_completed(run, llm_analysis)
+        save_run(db_path, run)
 
     report = build_preview_report(
         result,
@@ -82,6 +89,7 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
         llm_analysis=llm_analysis,
     )
     run = record_report_completed(run, report)
+    save_run(db_path, run)
 
     if use_llm:
         click.echo(f"LLM summary: {report['summary']}")
@@ -114,6 +122,23 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
 
 
 
+
+
+@cli.command()
+@click.argument("run_id")
+def status(run_id: str) -> None:
+    """Show a saved run status."""
+    run = get_run(Path("data/insight.db"), run_id)
+
+    if run is None:
+        raise click.ClickException(f"Run not found: {run_id}")
+
+    click.echo(f"Run ID: {run['run_id']}")
+    click.echo(f"Status: {run['status']}")
+    click.echo("Trace events:")
+    for event in run["events"]:
+        event_payload = json.dumps(event.get("payload", {}), sort_keys=True)
+        click.echo(f"- {event['event_type']}: {event_payload}")
 
 
 @cli.command()

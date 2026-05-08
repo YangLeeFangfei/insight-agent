@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from insight_agent.agent.trace import build_trace_event
 from insight_agent.collectors.base import CollectionRequest
 from insight_agent.reporting.evidence_quality import normalize_evidence_summary
@@ -21,11 +23,15 @@ def build_run_plan(query_spec: dict[str, object]) -> dict[str, object]:
 def initialize_run(query_spec: dict[str, object], collection_request: CollectionRequest | None = None,) -> dict[str, object]:
 
     plan = build_run_plan(query_spec)
+    run_id = f"run_{uuid4().hex}"
 
     events = [
         build_trace_event(
             "run.started",
-            {"query": query_spec["raw_query"]},
+            {
+                "run_id": run_id,
+                "query": query_spec["raw_query"],
+            },
         ),
         build_trace_event(
             "run.plan_generated",
@@ -51,6 +57,7 @@ def initialize_run(query_spec: dict[str, object], collection_request: Collection
         status = "collection_requested"
 
     return {
+        "run_id": run_id,
         "status": status,
         "plan": plan,
         "events": events,

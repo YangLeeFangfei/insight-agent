@@ -4,9 +4,11 @@ import pytest
 from insight_agent.cli import cli
 from pathlib import Path
 from insight_agent.db.repository import (
+    get_run,
     init_db,
     insert_article,
     list_articles_for_companies,
+    save_run,
 )
 from insight_agent.llm.factory import FakeLLMClient, build_llm_client
 from insight_agent.llm.client import OpenAICompatibleLLMClient
@@ -29,6 +31,57 @@ def test_cli_help_shows_commands() -> None:
     assert "Insight Agent CLI." in result.output
     assert "search" in result.output
 
+
+def test_status_outputs_saved_run_state() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        db_path = Path("data/insight.db")
+        init_db(db_path)
+        save_run(
+            db_path,
+            {
+                "run_id": "run_test",
+                "status": "report_completed",
+                "plan": {
+                    "query": "Compare ChatGPT sentiment in the last 30 days",
+                    "stages": ["analysis", "reporting"],
+                },
+                "events": [
+                    {
+                        "event_type": "run.started",
+                        "payload": {"run_id": "run_test"},
+                    },
+                    {
+                        "event_type": "run.report_completed",
+                        "payload": {"evidence_count": 1},
+                    },
+                ],
+            },
+        )
+
+        result = runner.invoke(cli, ["status", "run_test"])
+
+    assert result.exit_code == 0
+    assert "Run ID: run_test" in result.output
+    assert "Status: report_completed" in result.output
+    assert "run.started" in result.output
+    assert "run.report_completed" in result.output
+    assert "evidence_count" in result.output
+    assert "1" in result.output
+
+
+def test_status_fails_when_run_does_not_exist() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        init_db(Path("data/insight.db"))
+
+        result = runner.invoke(cli, ["status", "run_missing"])
+
+    assert result.exit_code == 1
+    assert "Run not found: run_missing" in result.output
+
 def test_search_outputs_parsed_query_details() -> None:
     runner = CliRunner()
 
@@ -39,6 +92,7 @@ def test_search_outputs_parsed_query_details() -> None:
         )
 
     assert result.exit_code == 0
+    assert "Run ID: run_" in result.output
     assert "ChatGPT" in result.output
     assert "Gemini" in result.output
     assert "30d" in result.output
@@ -192,6 +246,89 @@ def test_search_outputs_structured_llm_report_by_default(monkeypatch) -> None:
     assert "run.report_completed" in result.output
 
 
+def test_search_persists_run_state(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_collect_articles(collection_request):
+        return [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ]
+
+    monkeypatch.setattr("insight_agent.cli.collect_articles", fake_collect_articles)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "Compare ChatGPT sentiment in the last 30 days",
+            ],
+        )
+        run_id_line = next(
+            line for line in result.output.splitlines()
+            if line.startswith("Run ID: ")
+        )
+        run_id = run_id_line.removeprefix("Run ID: ")
+        saved_run = get_run(Path("data/insight.db"), run_id)
+
+    assert result.exit_code == 0
+    assert saved_run["run_id"] == run_id
+    assert saved_run["status"] == "report_completed"
+    assert saved_run["events"][-1]["event_type"] == "run.report_completed"
+
+
+def test_search_persists_run_state_after_each_stage(monkeypatch) -> None:
+    runner = CliRunner()
+    saved_statuses = []
+
+    def fake_collect_articles(collection_request):
+        return [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ]
+
+    def fake_save_run(db_path, run):
+        saved_statuses.append(run["status"])
+
+    monkeypatch.setattr("insight_agent.cli.collect_articles", fake_collect_articles)
+    monkeypatch.setattr("insight_agent.cli.save_run", fake_save_run)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "Compare ChatGPT sentiment in the last 30 days",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert saved_statuses == [
+        "collection_completed",
+        "analysis_completed",
+        "report_completed",
+    ]
+
+
 def test_search_defaults_missing_evidence_quality_counts(monkeypatch) -> None:
     runner = CliRunner()
 
@@ -320,6 +457,51 @@ def test_search_records_failed_run_when_default_llm_analysis_raises(monkeypatch)
     assert "Run status: failed" in result.output
     assert "run.failed" in result.output
     assert "LLM analysis failed: model timeout" in result.output
+
+
+def test_search_persists_failed_run_state(monkeypatch) -> None:
+    runner = CliRunner()
+
+    def fake_collect_articles(collection_request):
+        return [
+            {
+                "company": "ChatGPT",
+                "title": "Launch update",
+                "source_name": "OpenAI",
+                "source_type": "announcement",
+                "content": "ChatGPT launched a new enterprise feature.",
+                "published_date": "2026-04-20",
+                "collected_at": "2026-04-20T10:00:00",
+                "url": "https://example.com/openai-launch",
+                "sentiment": "positive",
+            }
+        ]
+
+    def fake_analyze_articles(query_spec, articles, client):
+        raise RuntimeError("model timeout")
+
+    monkeypatch.setattr("insight_agent.cli.collect_articles", fake_collect_articles)
+    monkeypatch.setattr("insight_agent.cli.analyze_articles", fake_analyze_articles)
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "search",
+                "Compare ChatGPT sentiment in the last 30 days",
+            ],
+        )
+        run_id_line = next(
+            line for line in result.output.splitlines()
+            if line.startswith("Run ID: ")
+        )
+        run_id = run_id_line.removeprefix("Run ID: ")
+        saved_run = get_run(Path("data/insight.db"), run_id)
+
+    assert result.exit_code == 1
+    assert saved_run["status"] == "failed"
+    assert saved_run["events"][-1]["event_type"] == "run.failed"
+    assert saved_run["events"][-1]["payload"]["error_message"] == "model timeout"
 
 
 

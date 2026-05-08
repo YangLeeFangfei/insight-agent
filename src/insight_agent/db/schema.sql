@@ -10,3 +10,11 @@ CREATE TABLE IF NOT EXISTS articles (
     url TEXT NOT NULL UNIQUE,
     sentiment TEXT   
 );
+
+CREATE TABLE IF NOT EXISTS runs (
+    run_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    query TEXT NOT NULL,
+    plan_json TEXT NOT NULL,
+    events_json TEXT NOT NULL
+);

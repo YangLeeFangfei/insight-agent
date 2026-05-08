@@ -47,6 +47,19 @@ def test_streamlit_app_displays_run_status() -> None:
 
     assert "st.write(f\"Status: {run['status']}\")" in app_source
 
+
+def test_streamlit_app_displays_run_id() -> None:
+    app_source = Path("src/insight_agent/ui/app.py").read_text()
+
+    assert "st.write(f\"Run ID: {run['run_id']}\")" in app_source
+
+
+def test_streamlit_app_persists_run_status_updates() -> None:
+    app_source = Path("src/insight_agent/ui/app.py").read_text()
+
+    assert "from insight_agent.db.repository import save_run" in app_source
+    assert app_source.count("save_run(db_path, run)") >= 3
+
 def test_streamlit_app_records_analysis_completed_status() -> None:
     app_source = Path("src/insight_agent/ui/app.py").read_text()
 

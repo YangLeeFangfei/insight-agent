@@ -7,6 +7,7 @@ from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
 from insight_agent.collectors.selector import collect_articles
 from insight_agent.collectors.base import build_collection_request
+from insight_agent.db.repository import save_run
 from insight_agent.ingestion import load_or_collect_articles
 from insight_agent.llm.analyst import analyze_articles
 from insight_agent.llm.factory import build_llm_client
@@ -46,6 +47,7 @@ if st.button("Preview Run"):
     article_records = ingestion_result.articles
     run = initialize_run(query_spec, collection_request)
     run = record_collection_completed(run, article_records)
+    save_run(db_path, run)
     llm_analysis = None
     llm_failed = False
     if use_llm:
@@ -57,11 +59,13 @@ if st.button("Preview Run"):
             )
         except Exception as exc:
             run = record_run_failed(run, "analysis", str(exc))
+            save_run(db_path, run)
             st.error(f"LLM analysis failed: {exc}")
             llm_failed = True
 
         if not llm_failed:
             run = record_analysis_completed(run, llm_analysis)
+            save_run(db_path, run)
 
 
     report = None
@@ -74,6 +78,7 @@ if st.button("Preview Run"):
             llm_analysis=llm_analysis,
         )
         run = record_report_completed(run, report)
+        save_run(db_path, run)
         report["trace_events"] = run["events"]
         report_path = write_html_report(
             report,
@@ -94,6 +99,7 @@ if st.button("Preview Run"):
         st.subheader("Run Plan")
         st.write(f"Needs confirmation: {run['plan']['needs_confirmation']}")
         st.write(f"Stages: {', '.join(run['plan']['stages'])}")
+        st.write(f"Run ID: {run['run_id']}")
         st.write(f"Status: {run['status']}")
         st.subheader("Ingestion")
         st.write(f"Used cache: {ingestion_result.used_cache}")

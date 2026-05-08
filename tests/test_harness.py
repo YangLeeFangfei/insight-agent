@@ -51,6 +51,25 @@ def test_initialize_run_returns_plan_and_trace_events() -> None:
     assert run["events"][0]["event_type"] == "run.started"
     assert run["events"][1]["event_type"] == "run.plan_generated"
 
+
+def test_initialize_run_assigns_run_id() -> None:
+    run = initialize_run(
+        {
+            "raw_query": "Compare ChatGPT and Gemini in the last 30 days",
+            "companies": ["ChatGPT", "Gemini"],
+            "time_range": "30d",
+            "metrics": ["sentiment", "topics"],
+            "plan_preview": {
+                "needs_confirmation": True,
+                "source_types": ["news", "announcement", "industry"],
+            },
+        }
+    )
+
+    assert isinstance(run["run_id"], str)
+    assert run["run_id"].startswith("run_")
+    assert run["events"][0]["payload"]["run_id"] == run["run_id"]
+
 def test_initialize_run_records_collection_request() -> None:
     query_spec = {
         "raw_query": "Compare ChatGPT and Gemini in the last 30 days",
