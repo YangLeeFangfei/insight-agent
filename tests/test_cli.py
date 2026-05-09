@@ -82,6 +82,125 @@ def test_status_fails_when_run_does_not_exist() -> None:
     assert result.exit_code == 1
     assert "Run not found: run_missing" in result.output
 
+
+def test_runs_outputs_saved_run_history() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        db_path = Path("data/insight.db")
+        init_db(db_path)
+        save_run(
+            db_path,
+            {
+                "run_id": "run_first",
+                "status": "failed",
+                "plan": {
+                    "query": "Compare ChatGPT sentiment",
+                    "stages": ["analysis"],
+                },
+                "events": [],
+            },
+        )
+        save_run(
+            db_path,
+            {
+                "run_id": "run_second",
+                "status": "report_completed",
+                "plan": {
+                    "query": "Compare Gemini topics",
+                    "stages": ["analysis", "reporting"],
+                },
+                "events": [],
+            },
+        )
+
+        result = runner.invoke(cli, ["runs"])
+
+    assert result.exit_code == 0
+    assert "Run history:" in result.output
+    assert "run_second" in result.output
+    assert "report_completed" in result.output
+    assert "Compare Gemini topics" in result.output
+    assert "run_first" in result.output
+
+
+def test_runs_accepts_limit_option() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        db_path = Path("data/insight.db")
+        init_db(db_path)
+        for index in range(3):
+            save_run(
+                db_path,
+                {
+                    "run_id": f"run_{index}",
+                    "status": "report_completed",
+                    "plan": {
+                        "query": f"Query {index}",
+                        "stages": ["analysis", "reporting"],
+                    },
+                    "events": [],
+                },
+            )
+
+        result = runner.invoke(cli, ["runs", "--limit", "2"])
+
+    assert result.exit_code == 0
+    assert "run_2" in result.output
+    assert "run_1" in result.output
+    assert "run_0" not in result.output
+
+
+def test_runs_accepts_status_option() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        db_path = Path("data/insight.db")
+        init_db(db_path)
+        save_run(
+            db_path,
+            {
+                "run_id": "run_failed",
+                "status": "failed",
+                "plan": {
+                    "query": "Compare ChatGPT sentiment",
+                    "stages": ["analysis"],
+                },
+                "events": [],
+            },
+        )
+        save_run(
+            db_path,
+            {
+                "run_id": "run_completed",
+                "status": "report_completed",
+                "plan": {
+                    "query": "Compare Gemini topics",
+                    "stages": ["analysis", "reporting"],
+                },
+                "events": [],
+            },
+        )
+
+        result = runner.invoke(cli, ["runs", "--status", "failed"])
+
+    assert result.exit_code == 0
+    assert "run_failed" in result.output
+    assert "run_completed" not in result.output
+
+
+def test_runs_outputs_empty_state_when_no_runs_exist() -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        init_db(Path("data/insight.db"))
+
+        result = runner.invoke(cli, ["runs"])
+
+    assert result.exit_code == 0
+    assert "No saved runs." in result.output
+
 def test_search_outputs_parsed_query_details() -> None:
     runner = CliRunner()
 
@@ -200,6 +319,17 @@ def test_cli_search_uses_ingestion_pipeline() -> None:
 
     assert "load_or_collect_articles" in cli_source
     assert "collect_fn=collect_articles" in cli_source
+
+
+def test_cli_runs_limits_history_output() -> None:
+    cli_source = Path("src/insight_agent/cli.py").read_text()
+
+    assert '@click.option("--limit", default=10' in cli_source
+    assert '@click.option("--status", "status_filter")' in cli_source
+    assert (
+        'list_runs(Path("data/insight.db"), limit=limit, status=status_filter)'
+        in cli_source
+    )
 
 def test_search_outputs_structured_llm_report_by_default(monkeypatch) -> None:
     runner = CliRunner()

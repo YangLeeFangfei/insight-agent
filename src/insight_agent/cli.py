@@ -4,7 +4,7 @@ import json
 import click
 from insight_agent.agent.planner import parse_query
 from insight_agent.collectors.base import build_collection_request
-from insight_agent.db.repository import get_run, save_run
+from insight_agent.db.repository import get_run, list_runs, save_run
 from pathlib import Path
 
 from insight_agent.collectors.selector import collect_articles
@@ -122,6 +122,22 @@ def search(query: str, refresh: bool, no_llm: bool) -> None:
 
 
 
+
+
+@cli.command()
+@click.option("--limit", default=10, type=click.IntRange(min=1), show_default=True)
+@click.option("--status", "status_filter")
+def runs(limit: int, status_filter: str | None) -> None:
+    """List saved runs."""
+    saved_runs = list_runs(Path("data/insight.db"), limit=limit, status=status_filter)
+
+    click.echo("Run history:")
+    if not saved_runs:
+        click.echo("No saved runs.")
+        return
+
+    for run in saved_runs:
+        click.echo(f"- {run['run_id']} | {run['status']} | {run['query']}")
 
 
 @cli.command()

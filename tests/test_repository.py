@@ -4,6 +4,7 @@ from insight_agent.db.repository import (
     insert_article,
     list_articles,
     list_articles_for_companies,
+    list_runs,
     save_run,
 )
 
@@ -130,3 +131,96 @@ def test_repository_saves_and_reads_run_state(tmp_path) -> None:
     assert saved_run["status"] == "report_completed"
     assert saved_run["plan"]["query"] == "Compare ChatGPT sentiment in the last 30 days"
     assert saved_run["events"][1]["event_type"] == "run.report_completed"
+
+
+def test_repository_lists_saved_runs(tmp_path) -> None:
+    db_path = tmp_path / "insight.db"
+    init_db(db_path)
+
+    save_run(
+        db_path,
+        {
+            "run_id": "run_first",
+            "status": "failed",
+            "plan": {
+                "query": "Compare ChatGPT sentiment",
+                "stages": ["analysis"],
+            },
+            "events": [],
+        },
+    )
+    save_run(
+        db_path,
+        {
+            "run_id": "run_second",
+            "status": "report_completed",
+            "plan": {
+                "query": "Compare Gemini topics",
+                "stages": ["analysis", "reporting"],
+            },
+            "events": [],
+        },
+    )
+
+    runs = list_runs(db_path)
+
+    assert [run["run_id"] for run in runs] == ["run_second", "run_first"]
+    assert runs[0]["status"] == "report_completed"
+    assert runs[0]["query"] == "Compare Gemini topics"
+
+
+def test_repository_limits_saved_runs(tmp_path) -> None:
+    db_path = tmp_path / "insight.db"
+    init_db(db_path)
+
+    for index in range(3):
+        save_run(
+            db_path,
+            {
+                "run_id": f"run_{index}",
+                "status": "report_completed",
+                "plan": {
+                    "query": f"Query {index}",
+                    "stages": ["analysis", "reporting"],
+                },
+                "events": [],
+            },
+        )
+
+    runs = list_runs(db_path, limit=2)
+
+    assert [run["run_id"] for run in runs] == ["run_2", "run_1"]
+
+
+def test_repository_filters_saved_runs_by_status(tmp_path) -> None:
+    db_path = tmp_path / "insight.db"
+    init_db(db_path)
+
+    save_run(
+        db_path,
+        {
+            "run_id": "run_failed",
+            "status": "failed",
+            "plan": {
+                "query": "Compare ChatGPT sentiment",
+                "stages": ["analysis"],
+            },
+            "events": [],
+        },
+    )
+    save_run(
+        db_path,
+        {
+            "run_id": "run_completed",
+            "status": "report_completed",
+            "plan": {
+                "query": "Compare Gemini topics",
+                "stages": ["analysis", "reporting"],
+            },
+            "events": [],
+        },
+    )
+
+    runs = list_runs(db_path, status="failed")
+
+    assert [run["run_id"] for run in runs] == ["run_failed"]

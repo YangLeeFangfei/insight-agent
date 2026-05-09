@@ -102,3 +102,45 @@ def get_run(db_path: Path, run_id: str) -> dict[str, object] | None:
         "plan": json.loads(row["plan_json"]),
         "events": json.loads(row["events_json"]),
     }
+
+
+def list_runs(
+    db_path: Path,
+    limit: int = 10,
+    status: str | None = None,
+) -> list[dict[str, str]]:
+    with _connect(db_path) as conn:
+        if status is None:
+            rows = list(
+                conn.execute(
+                    """
+                    SELECT run_id, status, query
+                    FROM runs
+                    ORDER BY rowid DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                )
+            )
+        else:
+            rows = list(
+                conn.execute(
+                    """
+                    SELECT run_id, status, query
+                    FROM runs
+                    WHERE status = ?
+                    ORDER BY rowid DESC
+                    LIMIT ?
+                    """,
+                    (status, limit),
+                )
+            )
+
+    return [
+        {
+            "run_id": row["run_id"],
+            "status": row["status"],
+            "query": row["query"],
+        }
+        for row in rows
+    ]

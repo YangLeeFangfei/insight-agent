@@ -7,7 +7,7 @@ from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
 from insight_agent.collectors.selector import collect_articles
 from insight_agent.collectors.base import build_collection_request
-from insight_agent.db.repository import save_run
+from insight_agent.db.repository import list_runs, save_run
 from insight_agent.ingestion import load_or_collect_articles
 from insight_agent.llm.analyst import analyze_articles
 from insight_agent.llm.factory import build_llm_client
@@ -24,6 +24,7 @@ from insight_agent.agent.harness import (
 st.set_page_config(page_title="Insight Agent", layout="wide")
 st.title("Insight Agent")
 st.caption("Workflow-first competitive intelligence workbench")
+db_path = Path("data/insight.db")
 
 query = st.text_area(
     "Query",
@@ -36,7 +37,6 @@ if st.button("Preview Run"):
     query_spec = parse_query(query)
     collection_request = build_collection_request(query_spec)
 
-    db_path = Path("data/insight.db")
     ingestion_result = load_or_collect_articles(
         db_path=db_path,
         companies=query_spec["companies"],
@@ -166,3 +166,20 @@ else:
 
     st.subheader("Query Preview")
     st.code(query)
+
+st.subheader("Run History")
+history_limit = st.number_input("History limit", min_value=1, value=10, step=1)
+history_status = st.selectbox("History status", ["all", "report_completed", "failed"])
+history_status_filter = None if history_status == "all" else history_status
+saved_runs = list_runs(
+    db_path,
+    limit=history_limit,
+    status=history_status_filter,
+)
+if not saved_runs:
+    st.write("No saved runs.")
+else:
+    for saved_run in saved_runs:
+        st.write(
+            f"- {saved_run['run_id']} | {saved_run['status']} | {saved_run['query']}"
+        )

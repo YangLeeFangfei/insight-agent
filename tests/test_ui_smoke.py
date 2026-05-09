@@ -57,8 +57,31 @@ def test_streamlit_app_displays_run_id() -> None:
 def test_streamlit_app_persists_run_status_updates() -> None:
     app_source = Path("src/insight_agent/ui/app.py").read_text()
 
-    assert "from insight_agent.db.repository import save_run" in app_source
+    assert "from insight_agent.db.repository import list_runs, save_run" in app_source
     assert app_source.count("save_run(db_path, run)") >= 3
+
+
+def test_streamlit_app_displays_run_history() -> None:
+    app_source = Path("src/insight_agent/ui/app.py").read_text()
+
+    assert "list_runs" in app_source
+    assert 'st.subheader("Run History")' in app_source
+    assert 'history_limit = st.number_input("History limit"' in app_source
+    assert 'history_status = st.selectbox("History status"' in app_source
+    assert 'history_status_filter = None if history_status == "all" else history_status' in app_source
+    assert (
+        "saved_runs = list_runs("
+        in app_source
+    )
+    assert "status=history_status_filter" in app_source
+    assert "for saved_run in saved_runs" in app_source
+
+
+def test_streamlit_app_displays_empty_run_history_state() -> None:
+    app_source = Path("src/insight_agent/ui/app.py").read_text()
+
+    assert "if not saved_runs:" in app_source
+    assert 'st.write("No saved runs.")' in app_source
 
 def test_streamlit_app_records_analysis_completed_status() -> None:
     app_source = Path("src/insight_agent/ui/app.py").read_text()
