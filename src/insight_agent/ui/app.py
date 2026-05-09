@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import streamlit as st
@@ -7,7 +8,7 @@ from insight_agent.reporting.builder import build_preview_report
 from insight_agent.reporting.html import write_html_report
 from insight_agent.collectors.selector import collect_articles
 from insight_agent.collectors.base import build_collection_request
-from insight_agent.db.repository import list_runs, save_run
+from insight_agent.db.repository import get_run, list_runs, save_run
 from insight_agent.ingestion import load_or_collect_articles
 from insight_agent.llm.analyst import analyze_articles
 from insight_agent.llm.factory import build_llm_client
@@ -183,3 +184,17 @@ else:
         st.write(
             f"- {saved_run['run_id']} | {saved_run['status']} | {saved_run['query']}"
         )
+
+st.subheader("Run Detail")
+default_run_id = saved_runs[0]["run_id"] if saved_runs else ""
+run_id_lookup = st.text_input("Run ID", value=default_run_id)
+if st.button("Load Run"):
+    selected_run = get_run(db_path, run_id_lookup)
+    if selected_run is None:
+        st.write("Run not found.")
+    else:
+        st.write(f"Run status: {selected_run['status']}")
+        st.write("Saved trace events:")
+        for event in selected_run["events"]:
+            event_payload = json.dumps(event.get("payload", {}), sort_keys=True)
+            st.write(f"- {event['event_type']}: {event_payload}")

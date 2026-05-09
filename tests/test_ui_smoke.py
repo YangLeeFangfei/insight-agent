@@ -57,7 +57,7 @@ def test_streamlit_app_displays_run_id() -> None:
 def test_streamlit_app_persists_run_status_updates() -> None:
     app_source = Path("src/insight_agent/ui/app.py").read_text()
 
-    assert "from insight_agent.db.repository import list_runs, save_run" in app_source
+    assert "from insight_agent.db.repository import get_run, list_runs, save_run" in app_source
     assert app_source.count("save_run(db_path, run)") >= 3
 
 
@@ -82,6 +82,24 @@ def test_streamlit_app_displays_empty_run_history_state() -> None:
 
     assert "if not saved_runs:" in app_source
     assert 'st.write("No saved runs.")' in app_source
+
+
+def test_streamlit_app_displays_run_detail_lookup() -> None:
+    app_source = Path("src/insight_agent/ui/app.py").read_text()
+
+    assert "import json" in app_source
+    assert "from insight_agent.db.repository import get_run, list_runs, save_run" in app_source
+    assert 'st.subheader("Run Detail")' in app_source
+    assert 'default_run_id = saved_runs[0]["run_id"] if saved_runs else ""' in app_source
+    assert 'run_id_lookup = st.text_input("Run ID", value=default_run_id)' in app_source
+    assert 'if st.button("Load Run"):' in app_source
+    assert "selected_run = get_run(db_path, run_id_lookup)" in app_source
+    assert 'st.write("Run not found.")' in app_source
+    assert "st.write(f\"Run status: {selected_run['status']}\")" in app_source
+    assert "for event in selected_run[\"events\"]" in app_source
+    assert 'event_payload = json.dumps(event.get("payload", {}), sort_keys=True)' in app_source
+    assert "st.write(f\"- {event['event_type']}: {event_payload}\")" in app_source
+
 
 def test_streamlit_app_records_analysis_completed_status() -> None:
     app_source = Path("src/insight_agent/ui/app.py").read_text()
