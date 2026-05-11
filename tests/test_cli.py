@@ -43,6 +43,7 @@ def test_status_outputs_saved_run_state() -> None:
             {
                 "run_id": "run_test",
                 "status": "report_completed",
+                "updated_at": "2026-05-09T10:00:00+00:00",
                 "plan": {
                     "query": "Compare ChatGPT sentiment in the last 30 days",
                     "stages": ["analysis", "reporting"],
@@ -65,6 +66,7 @@ def test_status_outputs_saved_run_state() -> None:
     assert result.exit_code == 0
     assert "Run ID: run_test" in result.output
     assert "Status: report_completed" in result.output
+    assert "Updated at: 2026-05-09T10:00:00+00:00" in result.output
     assert "run.started" in result.output
     assert "run.report_completed" in result.output
     assert "evidence_count" in result.output
@@ -106,6 +108,7 @@ def test_runs_outputs_saved_run_history() -> None:
             {
                 "run_id": "run_second",
                 "status": "report_completed",
+                "updated_at": "2026-05-09T10:00:00+00:00",
                 "plan": {
                     "query": "Compare Gemini topics",
                     "stages": ["analysis", "reporting"],
@@ -120,6 +123,7 @@ def test_runs_outputs_saved_run_history() -> None:
     assert "Run history:" in result.output
     assert "run_second" in result.output
     assert "report_completed" in result.output
+    assert "2026-05-09T10:00:00+00:00" in result.output
     assert "Compare Gemini topics" in result.output
     assert "run_first" in result.output
 

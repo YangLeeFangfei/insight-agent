@@ -1,3 +1,5 @@
+import sqlite3
+
 from insight_agent.db.repository import (
     get_run,
     init_db,
@@ -103,6 +105,7 @@ def test_repository_saves_and_reads_run_state(tmp_path) -> None:
     run = {
         "run_id": "run_test",
         "status": "report_completed",
+        "updated_at": "2026-05-09T10:00:00+00:00",
         "plan": {
             "query": "Compare ChatGPT sentiment in the last 30 days",
             "stages": ["analysis", "reporting"],
@@ -129,6 +132,7 @@ def test_repository_saves_and_reads_run_state(tmp_path) -> None:
 
     assert saved_run["run_id"] == "run_test"
     assert saved_run["status"] == "report_completed"
+    assert saved_run["updated_at"] == "2026-05-09T10:00:00+00:00"
     assert saved_run["plan"]["query"] == "Compare ChatGPT sentiment in the last 30 days"
     assert saved_run["events"][1]["event_type"] == "run.report_completed"
 
@@ -142,6 +146,7 @@ def test_repository_lists_saved_runs(tmp_path) -> None:
         {
             "run_id": "run_first",
             "status": "failed",
+            "updated_at": "2026-05-09T09:00:00+00:00",
             "plan": {
                 "query": "Compare ChatGPT sentiment",
                 "stages": ["analysis"],
@@ -154,6 +159,7 @@ def test_repository_lists_saved_runs(tmp_path) -> None:
         {
             "run_id": "run_second",
             "status": "report_completed",
+            "updated_at": "2026-05-09T10:00:00+00:00",
             "plan": {
                 "query": "Compare Gemini topics",
                 "stages": ["analysis", "reporting"],
@@ -167,6 +173,7 @@ def test_repository_lists_saved_runs(tmp_path) -> None:
     assert [run["run_id"] for run in runs] == ["run_second", "run_first"]
     assert runs[0]["status"] == "report_completed"
     assert runs[0]["query"] == "Compare Gemini topics"
+    assert runs[0]["updated_at"] == "2026-05-09T10:00:00+00:00"
 
 
 def test_repository_limits_saved_runs(tmp_path) -> None:
@@ -224,3 +231,39 @@ def test_repository_filters_saved_runs_by_status(tmp_path) -> None:
     runs = list_runs(db_path, status="failed")
 
     assert [run["run_id"] for run in runs] == ["run_failed"]
+
+
+def test_init_db_migrates_existing_runs_table_with_updated_at(tmp_path) -> None:
+    db_path = tmp_path / "insight.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE runs (
+                run_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                query TEXT NOT NULL,
+                plan_json TEXT NOT NULL,
+                events_json TEXT NOT NULL
+            )
+            """
+        )
+
+    init_db(db_path)
+    save_run(
+        db_path,
+        {
+            "run_id": "run_migrated",
+            "status": "report_completed",
+            "updated_at": "2026-05-09T11:00:00+00:00",
+            "plan": {
+                "query": "Compare Claude sentiment",
+                "stages": ["analysis", "reporting"],
+            },
+            "events": [],
+        },
+    )
+
+    runs = list_runs(db_path)
+
+    assert runs[0]["updated_at"] == "2026-05-09T11:00:00+00:00"

@@ -1,12 +1,33 @@
 
 import json
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
+
+
+def _current_timestamp() -> str:
+    return datetime.now(UTC).isoformat()
+
 
 def _connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _ensure_runs_updated_at_column(conn: sqlite3.Connection) -> None:
+    columns = [
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(runs)")
+    ]
+    if "updated_at" not in columns:
+        conn.execute("ALTER TABLE runs ADD COLUMN updated_at TEXT")
+
+    conn.execute(
+        "UPDATE runs SET updated_at = ? WHERE updated_at IS NULL OR updated_at = ''",
+        (_current_timestamp(),),
+    )
+
 
 def init_db(db_path: Path) -> None:
     schema_path = Path(__file__).with_name("schema.sql")
@@ -15,6 +36,7 @@ def init_db(db_path: Path) -> None:
 
     with _connect(db_path) as conn:
         conn.executescript(schema)
+        _ensure_runs_updated_at_column(conn)
 
 def insert_article(db_path: Path, article: dict[str, str]) -> None:
     with _connect(db_path) as conn:
@@ -60,17 +82,20 @@ def list_articles_for_companies(db_path: Path, companies: list[str], ) -> list[s
 
 
 def save_run(db_path: Path, run: dict[str, object]) -> None:
+    updated_at = str(run.get("updated_at") or _current_timestamp())
+
     with _connect(db_path) as conn:
         conn.execute(
             """
             INSERT INTO runs (
-                run_id, status, query, plan_json, events_json
-            ) VALUES (?, ?, ?, ?, ?)
+                run_id, status, query, plan_json, events_json, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id) DO UPDATE SET
                 status = excluded.status,
                 query = excluded.query,
                 plan_json = excluded.plan_json,
-                events_json = excluded.events_json
+                events_json = excluded.events_json,
+                updated_at = excluded.updated_at
             """,
             (
                 run["run_id"],
@@ -78,6 +103,7 @@ def save_run(db_path: Path, run: dict[str, object]) -> None:
                 run["plan"]["query"],
                 json.dumps(run["plan"]),
                 json.dumps(run["events"]),
+                updated_at,
             ),
         )
 
@@ -86,7 +112,7 @@ def get_run(db_path: Path, run_id: str) -> dict[str, object] | None:
     with _connect(db_path) as conn:
         row = conn.execute(
             """
-            SELECT run_id, status, query, plan_json, events_json
+            SELECT run_id, status, query, plan_json, events_json, updated_at
             FROM runs
             WHERE run_id = ?
             """,
@@ -99,6 +125,7 @@ def get_run(db_path: Path, run_id: str) -> dict[str, object] | None:
     return {
         "run_id": row["run_id"],
         "status": row["status"],
+        "updated_at": row["updated_at"],
         "plan": json.loads(row["plan_json"]),
         "events": json.loads(row["events_json"]),
     }
@@ -114,9 +141,9 @@ def list_runs(
             rows = list(
                 conn.execute(
                     """
-                    SELECT run_id, status, query
+                    SELECT run_id, status, query, updated_at
                     FROM runs
-                    ORDER BY rowid DESC
+                    ORDER BY updated_at DESC, rowid DESC
                     LIMIT ?
                     """,
                     (limit,),
@@ -126,10 +153,10 @@ def list_runs(
             rows = list(
                 conn.execute(
                     """
-                    SELECT run_id, status, query
+                    SELECT run_id, status, query, updated_at
                     FROM runs
                     WHERE status = ?
-                    ORDER BY rowid DESC
+                    ORDER BY updated_at DESC, rowid DESC
                     LIMIT ?
                     """,
                     (status, limit),
@@ -141,6 +168,7 @@ def list_runs(
             "run_id": row["run_id"],
             "status": row["status"],
             "query": row["query"],
+            "updated_at": row["updated_at"],
         }
         for row in rows
     ]

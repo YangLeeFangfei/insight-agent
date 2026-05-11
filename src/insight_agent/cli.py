@@ -137,7 +137,9 @@ def runs(limit: int, status_filter: str | None) -> None:
         return
 
     for run in saved_runs:
-        click.echo(f"- {run['run_id']} | {run['status']} | {run['query']}")
+        click.echo(
+            f"- {run['run_id']} | {run['status']} | {run['updated_at']} | {run['query']}"
+        )
 
 
 @cli.command()
@@ -151,6 +153,7 @@ def status(run_id: str) -> None:
 
     click.echo(f"Run ID: {run['run_id']}")
     click.echo(f"Status: {run['status']}")
+    click.echo(f"Updated at: {run['updated_at']}")
     click.echo("Trace events:")
     for event in run["events"]:
         event_payload = json.dumps(event.get("payload", {}), sort_keys=True)

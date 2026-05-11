@@ -75,6 +75,7 @@ def test_streamlit_app_displays_run_history() -> None:
     )
     assert "status=history_status_filter" in app_source
     assert "for saved_run in saved_runs" in app_source
+    assert "saved_run['updated_at']" in app_source
 
 
 def test_streamlit_app_displays_empty_run_history_state() -> None:
@@ -96,6 +97,7 @@ def test_streamlit_app_displays_run_detail_lookup() -> None:
     assert "selected_run = get_run(db_path, run_id_lookup)" in app_source
     assert 'st.write("Run not found.")' in app_source
     assert "st.write(f\"Run status: {selected_run['status']}\")" in app_source
+    assert "st.write(f\"Updated at: {selected_run['updated_at']}\")" in app_source
     assert "for event in selected_run[\"events\"]" in app_source
     assert 'event_payload = json.dumps(event.get("payload", {}), sort_keys=True)' in app_source
     assert "st.write(f\"- {event['event_type']}: {event_payload}\")" in app_source

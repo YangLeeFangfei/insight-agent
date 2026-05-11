@@ -182,7 +182,7 @@ if not saved_runs:
 else:
     for saved_run in saved_runs:
         st.write(
-            f"- {saved_run['run_id']} | {saved_run['status']} | {saved_run['query']}"
+            f"- {saved_run['run_id']} | {saved_run['status']} | {saved_run['updated_at']} | {saved_run['query']}"
         )
 
 st.subheader("Run Detail")
@@ -194,6 +194,7 @@ if st.button("Load Run"):
         st.write("Run not found.")
     else:
         st.write(f"Run status: {selected_run['status']}")
+        st.write(f"Updated at: {selected_run['updated_at']}")
         st.write("Saved trace events:")
         for event in selected_run["events"]:
             event_payload = json.dumps(event.get("payload", {}), sort_keys=True)

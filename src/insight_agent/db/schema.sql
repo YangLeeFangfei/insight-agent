@@ -16,5 +16,6 @@ CREATE TABLE IF NOT EXISTS runs (
     status TEXT NOT NULL,
     query TEXT NOT NULL,
     plan_json TEXT NOT NULL,
-    events_json TEXT NOT NULL
+    events_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
